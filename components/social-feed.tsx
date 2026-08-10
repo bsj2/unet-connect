@@ -27,6 +27,7 @@ export function SocialFeed() {
         .select(`
           *,
           users (nombre, apellido, rol, email),
+          groups (id, name),
           comments (id, content, created_at, user_id, users(nombre, apellido)),
           reactions (id, user_id)
         `)

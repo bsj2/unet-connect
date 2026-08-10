@@ -92,30 +92,50 @@ export function PostCard({ post, currentUserId, onDelete }: PostCardProps) {
   return (
     <>
       <div className="bg-card border border-border rounded-lg p-6 mb-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
-        {/* Header del Post */}
+       {/* Header del Post */}
         <div className="flex items-start justify-between mb-4">
-        <Link href={`/profile/${post.user_id}`} className="flex items-start gap-3 hover:opacity-80 transition-opacity">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {post.users?.avatar_url ? (
-              <img src={post.users.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-sm font-bold text-primary-foreground">{initials}</span>
-            )}
+          <div className="flex items-start gap-3">
+            <Link href={`/profile/${post.user_id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center overflow-hidden">
+                {post.users?.avatar_url ? (
+                  <img src={post.users.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-primary-foreground">{initials}</span>
+                )}
+              </div>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link href={`/profile/${post.user_id}`} className="font-semibold text-foreground hover:underline">
+                  {authorName}
+                </Link>
+                
+                {/* SI EL POST PERTENECE A UN GRUPO, MOSTRAMOS LA ETIQUETA */}
+                {post.groups && (
+                  <>
+                    <span className="text-muted-foreground text-xs">in</span>
+                    <Link 
+                      href={`/groups/${post.groups.id}`}
+                      className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors"
+                    >
+                      {post.groups.name}
+                    </Link>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{authorRole} • {timeAgo}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-foreground hover:underline">{authorName}</h3>
-            <p className="text-xs text-muted-foreground">{authorRole} • {timeAgo}</p>
-          </div>
-        </Link>
-        {isAuthor && (
-          <button 
-            onClick={() => setShowDeleteDialog(true)}
-            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-          >
-            <Trash2 size={16} />
-          </button>
-        )}
-      </div>
+
+          {isAuthor && (
+            <button 
+              onClick={() => setShowDeleteDialog(true)}
+              className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
 
         {/* Contenido */}
         {/* Contenido de texto */}
