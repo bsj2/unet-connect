@@ -21,8 +21,8 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground)
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -85,15 +85,12 @@
 
 .dark {
   color-scheme: dark;
-  /* Fondo principal en Azul Oscuro Slate (Slate-950) */
   --background: oklch(0.13 0.028 261.692);
   --foreground: oklch(0.985 0.002 247.858);
-  /* Tarjetas con un azul ligeramente más claro para elevación (Slate-900) */
   --card: oklch(0.18 0.032 258.322);
   --card-foreground: oklch(0.985 0.002 247.858);
   --popover: oklch(0.18 0.032 258.322);
   --popover-foreground: oklch(0.985 0.002 247.858);
-  /* Color Primario Azul brillante sobrio para contraste */
   --primary: oklch(0.58 0.21 260);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.24 0.034 255);
@@ -103,7 +100,7 @@
   --accent: oklch(0.24 0.034 255);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0); /* <- AÑADE ESTA LÍNEA (Blanco) */
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.26 0.032 255 / 80%);
   --input: oklch(0.26 0.032 255 / 90%);
   --ring: oklch(0.58 0.21 260);
@@ -140,6 +137,7 @@
     --accent: oklch(0.24 0.034 255);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
     --border: oklch(0.26 0.032 255 / 80%);
     --input: oklch(0.26 0.032 255 / 90%);
     --ring: oklch(0.58 0.21 260);
