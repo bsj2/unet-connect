@@ -191,7 +191,7 @@ export function Header() {
 
             {/* CAMPANA DE NOTIFICACIONES */}
             <Popover>
-              <PopoverTrigger asChild>
+              <PopoverTrigger>
                 <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground outline-none">
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
