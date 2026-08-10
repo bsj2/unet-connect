@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabase'
 
 interface CreatePostCardProps {
   onPostCreated: () => void
+  groupId?: string
 }
 
-export function CreatePostCard({ onPostCreated }: CreatePostCardProps) {
+export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) {
   const [text, setText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -75,7 +76,8 @@ export function CreatePostCard({ onPostCreated }: CreatePostCardProps) {
         type: 'post',
         image_url: image_url,
         file_url: file_url,
-        file_name: selectedFile ? selectedFile.name : null // <- GUARDAMOS EL NOMBRE AQUÍ
+        file_name: selectedFile ? selectedFile.name : null,
+        group_id: groupId || null // <- Le pasamos el ID del grupo aquí
       })
 
       if (error) throw error
