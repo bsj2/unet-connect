@@ -86,6 +86,7 @@ export default function ProfilePage() {
         .from('products')
         .select('*, seller:users(id, nombre, apellido, avatar_url)')
         .eq('seller_id', profileId)
+        .eq('status', 'AVAILABLE')
         .order('created_at', { ascending: false })
 
       setTradeProducts(tradeData || [])

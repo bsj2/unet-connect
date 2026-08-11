@@ -270,7 +270,7 @@ export function Header() {
           <>
             {/* ADMIN PANEL */}
             {isAdmin && (
-              <Link href="/admin" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-primary hover:text-primary/80 hidden sm:block" title="Admin Dashboard">
+              <Link href="/admin" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-primary hover:text-primary/80" title="Admin Dashboard">
                 <ShieldAlert className="w-5 h-5" />
               </Link>
             )}
