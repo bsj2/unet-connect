@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [reports, setReports] = useState<any[]>([])
   const [pendingProducts, setPendingProducts] = useState<any[]>([])
@@ -17,6 +18,8 @@ export default function AdminDashboard() {
     const checkAdminAndFetchData = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return setLoading(false)
+
+      setCurrentUserId(session.user.id)
 
       const { data: profile } = await supabase.from('users').select('rol').eq('id', session.user.id).single()
       
@@ -66,7 +69,7 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteReportedPost = async (reportId: string, postId: string) => {
-    await supabase.from('posts').delete().eq('id', postId) // Esto borra el post en cascada
+    await supabase.from('posts').delete().eq('id', postId) 
     setReports(prev => prev.filter(r => r.id !== reportId))
   }
 
@@ -76,8 +79,27 @@ export default function AdminDashboard() {
   }
 
   const toggleUserBan = async (userId: string, currentBanStatus: boolean) => {
-    await supabase.from('users').update({ is_banned: !currentBanStatus }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: !currentBanStatus } : u))
+    // Validación de seguridad para no banearse a sí mismo
+    if (userId === currentUserId) {
+      alert("You cannot ban yourself.")
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_banned: !currentBanStatus })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, is_banned: !currentBanStatus } : u
+      ))
+      
+    } catch (error: any) {
+      alert("Error updating ban status: " + error.message)
+    }
   }
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary w-10 h-10" /></div>
@@ -182,12 +204,16 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 font-medium text-foreground">{u.nombre} {u.apellido}</td>
                       <td className="px-6 py-4 hidden sm:table-cell">{u.rol}</td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => toggleUserBan(u.id, u.is_banned)}
-                          className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center justify-end gap-1.5 ml-auto transition-colors ${u.is_banned ? 'bg-secondary text-foreground border border-border hover:bg-secondary/80' : 'bg-destructive/10 text-destructive hover:bg-destructive hover:text-white'}`}
-                        >
-                          <Ban size={14} /> {u.is_banned ? 'Unban User' : 'Ban User'}
-                        </button>
+                        {u.id !== currentUserId ? (
+                          <button 
+                            onClick={() => toggleUserBan(u.id, u.is_banned)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center justify-end gap-1.5 ml-auto transition-colors ${u.is_banned ? 'bg-secondary text-foreground border border-border hover:bg-secondary/80' : 'bg-destructive/10 text-destructive hover:bg-destructive hover:text-white'}`}
+                          >
+                            <Ban size={14} /> {u.is_banned ? 'Unban User' : 'Ban User'}
+                          </button>
+                        ) : (
+                          <span className="text-xs font-medium text-muted-foreground px-3 py-1.5">You</span>
+                        )}
                       </td>
                     </tr>
                   ))}

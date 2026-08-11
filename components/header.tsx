@@ -170,7 +170,7 @@ export function Header() {
   const hasSuggestions = suggestions.users.length > 0 || suggestions.posts.length > 0 || suggestions.groups.length > 0 || suggestions.clips.length > 0 || suggestions.trade.length > 0;
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-[60] flex items-center justify-between px-4 md:px-6">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-[50] flex items-center justify-between px-4 md:px-6">
       
       {/* DROPDOWN SEARCH - Made visible on mobile */}
       <form ref={searchRef} onSubmit={handleSearchSubmit} className="flex-1 max-w-md flex items-center relative mr-3 sm:mr-0">
