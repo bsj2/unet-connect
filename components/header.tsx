@@ -87,8 +87,11 @@ export function Header() {
         setShowSuggestions(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -96,18 +99,24 @@ export function Header() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (session?.user) {
         setIsLoggedIn(true);
         setCurrentUserId(session.user.id);
+
         const n = session.user.user_metadata?.nombre || "";
         const a = session.user.user_metadata?.apellido || "";
-        setInitials(`${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`);
+
+        setInitials(
+          `${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`
+        );
 
         const { data: userData } = await supabase
           .from("users")
           .select("rol")
           .eq("id", session.user.id)
           .single();
+
         if (userData?.rol === "Professor" || userData?.rol === "Staff") {
           setIsAdmin(true);
         }
@@ -118,8 +127,10 @@ export function Header() {
         setCurrentUserId(null);
         setIsAdmin(false);
       }
+
       setLoading(false);
     };
+
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -127,10 +138,12 @@ export function Header() {
         if (event === "SIGNED_IN" && session?.user) {
           setIsLoggedIn(true);
           setCurrentUserId(session.user.id);
+
           const n = session.user.user_metadata?.nombre || "";
           const a = session.user.user_metadata?.apellido || "";
+
           setInitials(
-            `${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`,
+            `${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`
           );
 
           supabase
@@ -139,8 +152,9 @@ export function Header() {
             .eq("id", session.user.id)
             .single()
             .then(({ data }) => {
-              if (data?.rol === "Professor" || data?.rol === "Staff")
+              if (data?.rol === "Professor" || data?.rol === "Staff") {
                 setIsAdmin(true);
+              }
             });
 
           fetchNotifications(session.user.id);
@@ -152,8 +166,9 @@ export function Header() {
           setNotifications([]);
           setUnreadCount(0);
         }
-      },
+      }
     );
+
     return () => authListener.subscription.unsubscribe();
   }, []);
 
@@ -162,12 +177,14 @@ export function Header() {
       const { data, error } = await supabase
         .from("notifications")
         .select(
-          "id, type, is_read, created_at, post_id, sender:users!fk_notification_sender(id, nombre, apellido, avatar_url)",
+          "id, type, is_read, created_at, post_id, sender:users!fk_notification_sender(id, nombre, apellido, avatar_url)"
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(20);
+
       if (error) throw error;
+
       if (data) {
         setNotifications(data);
         setUnreadCount(data.filter((n) => !n.is_read).length);
@@ -183,11 +200,13 @@ export function Header() {
         .from("notifications")
         .update({ is_read: true })
         .eq("id", notificationId);
+
       setNotifications((prev) =>
         prev.map((n) =>
-          n.id === notificationId ? { ...n, is_read: true } : n,
-        ),
+          n.id === notificationId ? { ...n, is_read: true } : n
+        )
       );
+
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Error marking read", error);
@@ -196,13 +215,18 @@ export function Header() {
 
   const markAllAsRead = async () => {
     if (!currentUserId) return;
+
     try {
       await supabase
         .from("notifications")
         .update({ is_read: true })
         .eq("user_id", currentUserId)
         .eq("is_read", false);
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, is_read: true }))
+      );
+
       setUnreadCount(0);
     } catch (error) {
       console.error(error);
@@ -220,63 +244,202 @@ export function Header() {
           clips: [],
           trade: [],
         });
+
         setIsSearching(false);
         return;
       }
+
       setIsSearching(true);
+
       const query = searchQuery.trim();
+      const searchTerm = query.replace(/^#/, "").trim();
+
       try {
-        const [usersRes, postsRes, groupsRes, clipsRes, tradeRes] =
-          await Promise.all([
-            supabase
-              .from("users")
-              .select("id, nombre, apellido, avatar_url")
-              .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
-              .limit(3),
+        // ---------------------------------------------------------
+        // 1. USERS
+        // ---------------------------------------------------------
+        const usersRes = await supabase
+          .from("users")
+          .select("id, nombre, apellido, avatar_url")
+          .or(
+            `nombre.ilike.%${searchTerm}%,apellido.ilike.%${searchTerm}%`
+          )
+          .limit(3);
+
+        const matchingUserIds = (usersRes.data || []).map(
+          (user) => user.id
+        );
+
+        // ---------------------------------------------------------
+        // 2. AUDIOS
+        // ---------------------------------------------------------
+        const audiosRes = await supabase
+          .from("audios")
+          .select("id, title")
+          .ilike("title", `%${searchTerm}%`)
+          .limit(20);
+
+        const matchingAudioIds = (audiosRes.data || []).map(
+          (audio) => audio.id
+        );
+
+        // ---------------------------------------------------------
+        // 3. POSTS
+        //    Search by:
+        //    - content
+        //    - hashtags
+        //    - author
+        // ---------------------------------------------------------
+        const postQueries = [
+          // Content
+          supabase
+            .from("posts")
+            .select("id, content, hashtags, type, user_id")
+            .ilike("content", `%${searchTerm}%`)
+            .limit(3),
+
+          // Hashtags
+          supabase
+            .from("posts")
+            .select("id, content, hashtags, type, user_id")
+            .filter("hashtags::text", "ilike", `%${searchTerm}%`)
+            .limit(3),
+        ];
+
+        // Author
+        if (matchingUserIds.length > 0) {
+          postQueries.push(
             supabase
               .from("posts")
-              .select("id, content")
-              .ilike("content", `%${query}%`)
-              .limit(3),
-            supabase
-              .from("groups")
-              .select("id, name")
-              .ilike("name", `%${query}%`)
-              .limit(3),
+              .select("id, content, hashtags, type, user_id")
+              .in("user_id", matchingUserIds)
+              .limit(3)
+          );
+        }
+
+        const postResults = await Promise.all(postQueries);
+
+        const allPosts = postResults.flatMap(
+          (result) => result.data || []
+        );
+
+        const uniquePosts = Array.from(
+          new Map(allPosts.map((post) => [post.id, post])).values()
+        ).slice(0, 3);
+
+        // ---------------------------------------------------------
+        // 4. CLIPS
+        //    Search by:
+        //    - caption/content
+        //    - author
+        //    - audio title
+        // ---------------------------------------------------------
+        const clipQueries = [
+          // Caption
+          supabase
+            .from("clips")
+            .select(`
+              id,
+              content,
+              user_id,
+              audio_id
+            `)
+            .ilike("content", `%${searchTerm}%`)
+            .limit(3),
+        ];
+
+        // Author
+        if (matchingUserIds.length > 0) {
+          clipQueries.push(
             supabase
               .from("clips")
-              .select("id, content")
-              .ilike("content", `%${query}%`)
-              .limit(3),
+              .select(`
+                id,
+                content,
+                user_id,
+                audio_id
+              `)
+              .in("user_id", matchingUserIds)
+              .limit(3)
+          );
+        }
+
+        // Audio title
+        if (matchingAudioIds.length > 0) {
+          clipQueries.push(
             supabase
-              .from("products")
-              .select("id, title, price")
-              .ilike("title", `%${query}%`)
-              .eq("status", "AVAILABLE")
-              .limit(3),
-          ]);
+              .from("clips")
+              .select(`
+                id,
+                content,
+                user_id,
+                audio_id
+              `)
+              .in("audio_id", matchingAudioIds)
+              .limit(3)
+          );
+        }
+
+        const clipResults = await Promise.all(clipQueries);
+
+        const allClips = clipResults.flatMap(
+          (result) => result.data || []
+        );
+
+        const uniqueClips = Array.from(
+          new Map(allClips.map((clip) => [clip.id, clip])).values()
+        ).slice(0, 3);
+
+        // ---------------------------------------------------------
+        // 5. OTHER SEARCHES
+        // ---------------------------------------------------------
+        const [groupsRes, tradeRes] = await Promise.all([
+          supabase
+            .from("groups")
+            .select("id, name")
+            .ilike("name", `%${searchTerm}%`)
+            .limit(3),
+
+          supabase
+            .from("products")
+            .select("id, title, price")
+            .ilike("title", `%${searchTerm}%`)
+            .eq("status", "AVAILABLE")
+            .limit(3),
+        ]);
+
         setSuggestions({
           users: usersRes.data || [],
-          posts: postsRes.data || [],
+          posts: uniquePosts,
           groups: groupsRes.data || [],
-          clips: clipsRes.data || [],
+          clips: uniqueClips,
           trade: tradeRes.data || [],
         });
       } catch (error) {
-        console.error(error);
+        console.error("Error searching:", error);
       } finally {
         setIsSearching(false);
       }
     };
-    const delayDebounceFn = setTimeout(() => fetchSuggestions(), 300);
+
+    const delayDebounceFn = setTimeout(
+      () => fetchSuggestions(),
+      300
+    );
+
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!searchQuery.trim()) return;
+
     setShowSuggestions(false);
-    router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+
+    router.push(
+      `/search?q=${encodeURIComponent(searchQuery.trim())}`
+    );
   };
 
   const handleSignOut = async () => await supabase.auth.signOut();
@@ -284,6 +447,7 @@ export function Header() {
   // Translated Notification Texts
   const renderNotificationContent = (notif: any) => {
     const senderName = `${notif.sender.nombre} ${notif.sender.apellido}`;
+
     switch (notif.type) {
       case "LIKE":
         return {
@@ -294,6 +458,7 @@ export function Header() {
             </span>
           ),
         };
+
       case "COMMENT":
         return {
           icon: <MessageCircle size={16} className="text-blue-500" />,
@@ -303,6 +468,7 @@ export function Header() {
             </span>
           ),
         };
+
       case "FRIEND_REQUEST":
         return {
           icon: <UserPlus size={16} className="text-green-500" />,
@@ -312,6 +478,7 @@ export function Header() {
             </span>
           ),
         };
+
       case "FOLLOW":
         return {
           icon: <Users size={16} className="text-primary" />,
@@ -321,6 +488,7 @@ export function Header() {
             </span>
           ),
         };
+
       default:
         return {
           icon: <Bell size={16} />,
@@ -346,6 +514,7 @@ export function Header() {
       >
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+
           <input
             type="text"
             value={searchQuery}
@@ -378,6 +547,7 @@ export function Header() {
                       <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                         <UserIcon size={12} /> Users
                       </div>
+
                       {suggestions.users.map((u) => (
                         <Link
                           key={u.id}
@@ -397,6 +567,7 @@ export function Header() {
                               </span>
                             )}
                           </div>
+
                           <span className="text-sm font-medium text-foreground truncate">
                             {u.nombre} {u.apellido}
                           </span>
@@ -411,10 +582,13 @@ export function Header() {
                       <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                         <Store size={12} /> Trade
                       </div>
+
                       {suggestions.trade.map((t) => (
                         <Link
                           key={t.id}
-                          href={`/search?q=${encodeURIComponent(t.title)}`}
+                          href={`/search?q=${encodeURIComponent(
+                            searchQuery.trim()
+                          )}&tab=trade`}
                           onClick={() => setShowSuggestions(false)}
                           className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
                         >
@@ -424,10 +598,12 @@ export function Header() {
                               className="text-muted-foreground"
                             />
                           </div>
+
                           <div className="flex flex-col overflow-hidden">
                             <span className="text-sm font-medium text-foreground truncate">
                               {t.title}
                             </span>
+
                             <span className="text-xs text-primary font-bold">
                               ${t.price}
                             </span>
@@ -443,10 +619,13 @@ export function Header() {
                       <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                         <Video size={12} /> Clips
                       </div>
+
                       {suggestions.clips.map((c) => (
                         <Link
                           key={c.id}
-                          href={`/clips?id=${c.id}`}
+                          href={`/search?q=${encodeURIComponent(
+                            searchQuery.trim()
+                          )}&tab=clips`}
                           onClick={() => setShowSuggestions(false)}
                           className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
                         >
@@ -456,6 +635,7 @@ export function Header() {
                               className="text-muted-foreground"
                             />
                           </div>
+
                           <span className="text-sm font-medium text-foreground truncate line-clamp-1">
                             {c.content || "Video Clip"}
                           </span>
@@ -464,14 +644,17 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Posts & Groups... */}
+                  {/* Posts & Groups */}
                   {(suggestions.posts.length > 0 ||
                     suggestions.groups.length > 0) && (
                     <div className="p-2 border-t border-border">
+                      {/* Groups */}
                       {suggestions.groups.map((g) => (
                         <Link
                           key={g.id}
-                          href={`/search?q=${encodeURIComponent(g.name)}`}
+                          href={`/search?q=${encodeURIComponent(
+                            searchQuery.trim()
+                          )}&tab=groups`}
                           onClick={() => setShowSuggestions(false)}
                           className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
                         >
@@ -479,27 +662,42 @@ export function Header() {
                             size={16}
                             className="text-muted-foreground ml-1"
                           />
+
                           <span className="text-sm font-medium text-foreground truncate">
                             {g.name}
                           </span>
                         </Link>
                       ))}
-                      {suggestions.posts.map((p) => (
-                        <Link
-                          key={p.id}
-                          href={`/search?q=${encodeURIComponent(p.content)}`}
-                          onClick={() => setShowSuggestions(false)}
-                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
-                        >
-                          <FileText
-                            size={16}
-                            className="text-muted-foreground ml-1 flex-shrink-0"
-                          />
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {p.content}
-                          </span>
-                        </Link>
-                      ))}
+
+                      {/* Posts */}
+                      {suggestions.posts.map((p) => {
+                        const postTab =
+                          p.type === "VISUAL"
+                            ? "feed"
+                            : "community";
+
+                        return (
+                          <Link
+                            key={p.id}
+                            href={`/search?q=${encodeURIComponent(
+                              searchQuery.trim()
+                            )}&tab=${postTab}`}
+                            onClick={() =>
+                              setShowSuggestions(false)
+                            }
+                            className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                          >
+                            <FileText
+                              size={16}
+                              className="text-muted-foreground ml-1 flex-shrink-0"
+                            />
+
+                            <span className="text-sm font-medium text-foreground truncate">
+                              {p.content || "Post"}
+                            </span>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -545,12 +743,14 @@ export function Header() {
             <Popover>
               <PopoverTrigger className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground outline-none">
                 <Bell className="w-5 h-5" />
+
                 {unreadCount > 0 && (
                   <span className="absolute top-1 right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground ring-2 ring-background">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </PopoverTrigger>
+
               <PopoverContent
                 className="w-80 p-0 mr-4 mt-1 border-border shadow-lg"
                 align="end"
@@ -559,6 +759,7 @@ export function Header() {
                   <h3 className="font-semibold text-foreground">
                     Notifications
                   </h3>
+
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
@@ -568,6 +769,7 @@ export function Header() {
                     </button>
                   )}
                 </div>
+
                 <div className="max-h-[350px] overflow-y-auto">
                   {notifications.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
@@ -575,24 +777,38 @@ export function Header() {
                     </div>
                   ) : (
                     notifications.map((notif) => {
-                      const { icon, text } = renderNotificationContent(notif);
+                      const { icon, text } =
+                        renderNotificationContent(notif);
+
                       return (
                         <div
                           key={notif.id}
-                          onClick={() => !notif.is_read && markAsRead(notif.id)}
-                          className={`flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer ${notif.is_read ? "opacity-70" : "bg-primary/5"}`}
+                          onClick={() =>
+                            !notif.is_read &&
+                            markAsRead(notif.id)
+                          }
+                          className={`flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer ${
+                            notif.is_read
+                              ? "opacity-70"
+                              : "bg-primary/5"
+                          }`}
                         >
                           <div className="mt-1 flex-shrink-0 bg-background p-1.5 rounded-full border border-border shadow-sm">
                             {icon}
                           </div>
+
                           <div className="flex-1 min-w-0 text-sm text-foreground">
                             <p className="line-clamp-2 leading-tight mb-1">
                               {text}
                             </p>
+
                             <span className="text-xs text-muted-foreground font-medium">
-                              {new Date(notif.created_at).toLocaleDateString()}
+                              {new Date(
+                                notif.created_at
+                              ).toLocaleDateString()}
                             </span>
                           </div>
+
                           {!notif.is_read && (
                             <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
                           )}

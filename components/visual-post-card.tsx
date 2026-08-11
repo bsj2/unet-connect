@@ -313,10 +313,15 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
   )
 
   const renderCommentInput = () => (
-    <form onSubmit={(e) => submitComment(e, null)} className={`flex gap-2 relative ${isHorizontal ? '' : 'mt-2 border-t border-border pt-4'}`}>
+    
+    currentUserId ? (
+      <form onSubmit={(e) => submitComment(e, null)} className={`flex gap-2 relative ${isHorizontal ? '' : 'mt-2 border-t border-border pt-4'}`}>
       <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-transparent border-b border-border py-2 text-sm focus:outline-none focus:border-primary transition-colors pr-12 text-foreground placeholder:text-muted-foreground" disabled={isSubmitting} />
       {newComment.trim() && <button data-protected="true" type="submit" disabled={isSubmitting} className="absolute right-0 top-1/2 -translate-y-1/2 text-primary font-semibold text-sm hover:text-primary/80">Post</button>}
     </form>
+    ) : (
+      <p className="text-sm text-muted-foreground text-center py-4">Log in to comment.</p>
+    )
   )
 
   const renderReportModal = () => (
