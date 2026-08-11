@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from 'next/link'
-import { toast } from '@/components/ui/toast' // Asegurado el path correcto de tu toast
+import { toast } from '@/components/ui/toast' 
 
 interface VisualPostCardProps {
   post: any
@@ -189,13 +189,27 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
   const renderCarousel = () => {
     if (images.length === 0) return null
     return (
-      <div className={`relative w-full bg-black flex items-center justify-center group ${isHorizontal ? 'flex-1' : 'aspect-square'}`}>
-        <img src={images[currentImageIdx]} alt="Post content" className="w-full h-full object-contain" />
+      <div className={`relative w-full bg-black overflow-hidden group ${isHorizontal ? 'flex-1 h-full' : 'aspect-square'}`}>
+        <img 
+          src={images[currentImageIdx]} 
+          alt="Post content" 
+          className="absolute inset-0 w-full h-full object-contain" 
+        />
         {images.length > 1 && (
           <>
-            <button onClick={prevImage} className="absolute left-2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"><ChevronLeft size={20} /></button>
-            <button onClick={nextImage} className="absolute right-2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"><ChevronRight size={20} /></button>
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+            <button 
+              onClick={prevImage} 
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button 
+              onClick={nextImage} 
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+            >
+              <ChevronRight size={20} />
+            </button>
+            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
               {images.map((_: any, idx: number) => (
                 <div key={idx} className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === currentImageIdx ? 'bg-primary' : 'bg-white/50'}`} />
               ))}
@@ -242,12 +256,13 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
             </p>
           )}
           
+          {/* Hashtags Integrados Visualmente */}
           {post.hashtags && post.hashtags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-1">
               {post.hashtags.map((tag: string, idx: number) => (
                 <Link 
                   key={idx} 
-                  href={`/search?q=${encodeURIComponent(tag)}`} 
+                  href={`/search?q=${encodeURIComponent(tag)}&tab=feed`} 
                   className="text-primary hover:text-primary/80 hover:underline font-medium text-[13px] bg-primary/10 px-2 py-0.5 rounded-md transition-colors"
                 >
                   #{tag}
@@ -311,7 +326,6 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
   )
 
   const renderCommentInput = () => (
-    
     currentUserId ? (
       <form onSubmit={(e) => submitComment(e, null)} className={`flex gap-2 relative ${isHorizontal ? '' : 'mt-2 border-t border-border pt-4'}`}>
       <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-transparent border-b border-border py-2 text-sm focus:outline-none focus:border-primary transition-colors pr-12 text-foreground placeholder:text-muted-foreground" disabled={isSubmitting} />

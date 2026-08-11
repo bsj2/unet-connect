@@ -116,7 +116,7 @@ function SearchResults() {
             .from("posts")
             .select(baseSelect)
             .eq("type", type)
-            .filter("hashtags::text", "ilike", `%${escapedSearchTerm}%`)
+           /*  .filter("hashtags::text", "ilike", `%${escapedSearchTerm}%`) */
             .order("created_at", { ascending: false })
             .limit(20);
 
