@@ -34,7 +34,6 @@ function SearchResults() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) setCurrentUserId(session.user.id)
 
-        // 5 Consultas en paralelo para mantener la velocidad
         const [usersRes, postsRes, groupsRes, clipsRes, tradeRes] = await Promise.all([
           supabase.from('users').select('id, nombre, apellido, avatar_url, rol, carrera, semestre').or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`).limit(20),
           supabase.from('posts').select(`*, users (nombre, apellido, rol, email, avatar_url), comments (id, content, created_at, user_id, users(nombre, apellido)), reactions (id, user_id)`).ilike('content', `%${query}%`).order('created_at', { ascending: false }).limit(20),
@@ -72,7 +71,6 @@ function SearchResults() {
     <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* Encabezado */}
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <SearchIcon className="w-6 h-6 text-primary" />
@@ -83,7 +81,6 @@ function SearchResults() {
           </p>
         </div>
 
-        {/* Pestañas con Scroll Horizontal para Móviles */}
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-muted/50 p-1 border border-border rounded-lg flex overflow-x-auto hide-scrollbar justify-start sm:grid sm:grid-cols-5 w-full max-w-2xl h-auto">
             <TabsTrigger value="users" className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm py-2 px-3">
@@ -103,7 +100,6 @@ function SearchResults() {
             </TabsTrigger>
           </TabsList>
 
-          {/* 1. Usuarios */}
           <TabsContent value="users" className="mt-6 outline-none">
             {loading ? ( <div className="text-center py-12 text-muted-foreground">Searching network...</div> ) : users.length === 0 ? (
               <div className="text-center py-12 bg-card border border-border rounded-lg"><User className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" /><h3 className="font-semibold text-foreground">No users found</h3></div>
@@ -128,7 +124,6 @@ function SearchResults() {
             )}
           </TabsContent>
 
-          {/* 2. Publicaciones */}
           <TabsContent value="posts" className="mt-6 space-y-4 outline-none max-w-2xl mx-auto">
             {loading ? ( <div className="text-center py-12 text-muted-foreground">Searching posts...</div> ) : posts.length === 0 ? (
               <div className="text-center py-12 bg-card border border-border rounded-lg"><FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" /><h3 className="font-semibold text-foreground">No posts found</h3></div>
@@ -137,7 +132,6 @@ function SearchResults() {
             )}
           </TabsContent>
 
-          {/* 3. Clips */}
           <TabsContent value="clips" className="mt-6 outline-none">
             {loading ? ( <div className="text-center py-12 text-muted-foreground">Searching clips...</div> ) : clips.length === 0 ? (
               <div className="text-center py-12 bg-card border border-border rounded-lg"><Video className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" /><h3 className="font-semibold text-foreground">No clips found</h3></div>
@@ -155,7 +149,6 @@ function SearchResults() {
             )}
           </TabsContent>
 
-          {/* 4. Trade (Productos) */}
           <TabsContent value="trade" className="mt-6 outline-none">
             {loading ? ( <div className="text-center py-12 text-muted-foreground">Searching items...</div> ) : trade.length === 0 ? (
               <div className="text-center py-12 bg-card border border-border rounded-lg"><Store className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" /><h3 className="font-semibold text-foreground">No items found</h3></div>
@@ -176,7 +169,6 @@ function SearchResults() {
             )}
           </TabsContent>
 
-          {/* 5. Grupos */}
           <TabsContent value="groups" className="mt-6 outline-none">
             {loading ? ( <div className="text-center py-12 text-muted-foreground">Searching groups...</div> ) : groups.length === 0 ? (
               <div className="text-center py-12 bg-card border border-border rounded-lg"><Users className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" /><h3 className="font-semibold text-foreground">No groups found</h3></div>

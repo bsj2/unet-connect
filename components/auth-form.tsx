@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { Mail, Lock, User, CreditCard, GraduationCap, BookOpen, Hash } from 'lucide-react'
-import { supabase } from '@/lib/supabase' // Importamos nuestro puente
-import { useRouter } from 'next/navigation' // Para redireccionar al muro
+import { supabase } from '@/lib/supabase' 
+import { useRouter } from 'next/navigation' 
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,6 @@ export function AuthForm() {
 
     try {
       if (isLogin) {
-        // --- LÓGICA DE INICIO DE SESIÓN ---
         const { error } = await supabase.auth.signInWithPassword({
           email: fullEmail,
           password,
@@ -50,14 +49,11 @@ export function AuthForm() {
         
         if (error) throw error
         
-        // Si todo sale bien, lo enviamos al Muro
         router.push('/')
         
       } else {
-        // --- LÓGICA DE REGISTRO ---
         const fullCedula = `${docType}-${cedula}`
         
-        // 1. Crear el usuario enviando todos los datos en los metadatos
         const { error: authError } = await supabase.auth.signUp({
           email: fullEmail,
           password,
@@ -86,7 +82,6 @@ export function AuthForm() {
 
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-card border border-border rounded-xl shadow-sm">
-      {/* Mostrar mensajes de error si existen */}
       {errorMsg && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 text-red-500 text-sm rounded-md">
           {errorMsg}
@@ -178,11 +173,10 @@ export function AuthForm() {
                     className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
                     <option value="">Select...</option>
-                    <option value="Estudiante">Student</option>
-                    <option value="Profesor">Professor</option>
-                    <option value="Preparador">Teaching Assistant</option>
-                    <option value="Egresado">Alumni</option>
-                    <option value="Personal Administrativo">Administrative Staff</option>
+                    <option value="Student">Student</option>
+                    <option value="Professor">Professor</option>
+                    <option value="Alumni">Alumni</option>
+                    <option value="Staff">Administrative Staff</option>
                   </select>
                 </div>
               </div>
@@ -197,19 +191,19 @@ export function AuthForm() {
                     className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
                     <option value="">Select...</option>
-                    <option value="Ingenieria Informatica">Ingenieria Informatica</option>
-                    <option value="Ingenieria Civil">Ingenieria Civil</option>
-                    <option value="Ingenieria Industrial">Ingenieria Industrial</option>
-                    <option value="Ingenieria en Produccion Animal">Ingenieria en Produccion Animal</option>
-                    <option value="Ingenieria Electronica">Ingenieria Electronica</option>
-                    <option value="Ingenieria Mecanica">Ingenieria Mecanica</option>
-                    <option value="Ingenieria Ambiental">Ingenieria Ambiental</option>
-                    <option value="Ingenieria Agronomica">Ingenieria Agronomica</option>
-                    <option value="Ingenieria Agroindustrial">Ingenieria Agroindustrial</option>
-                    <option value="Arquitectura">Arquitectura</option>
-                    <option value="Licenciatura en Musica">Licenciatura en Musica</option>
-                    <option value="Licenciatura en Psicologia">Licenciatura en Psicologia</option>
-                    <option value="Entrenamiento Deportivo">Entrenamiento deportivo</option>
+                    <option value="Computer Engineering">Computer Engineering</option>
+                    <option value="Civil Engineering">Civil Engineering</option>
+                    <option value="Industrial Engineering">Industrial Engineering</option>
+                    <option value="Animal Production Engineering">Animal Production Engineering</option>
+                    <option value="Electronic Engineering">Electronic Engineering</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option value="Environmental Engineering">Environmental Engineering</option>
+                    <option value="Agronomic Engineering">Agronomic Engineering</option>
+                    <option value="Agroindustrial Engineering">Agroindustrial Engineering</option>
+                    <option value="Architecture">Architecture</option>
+                    <option value="Music">Music</option>
+                    <option value="Psychology">Psychology</option>
+                    <option value="Sports Training">Sports Training</option>
                   </select>
                 </div>
               </div>
@@ -278,9 +272,10 @@ export function AuthForm() {
 
         <button 
           type="submit" 
-          className="w-full py-2 px-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium text-sm transition-colors mt-4"
+          disabled={loading}
+          className="w-full py-2 px-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium text-sm transition-colors mt-4 disabled:opacity-50"
         >
-          {isLogin ? 'Sign In' : 'Sign Up'}
+          {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Sign Up'}
         </button>
       </form>
 

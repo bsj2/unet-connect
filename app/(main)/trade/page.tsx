@@ -1,10 +1,21 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Search, Plus, Tag, Loader2, Store, Upload, Image as ImageIcon, MessageCircle, Trash2 } from 'lucide-react'
+import { Search, Plus, Tag, Loader2, Store, Image as ImageIcon, MessageCircle, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import Link from 'next/link'
+import { toast } from '@/components/ui/toast'
 
 const CATEGORIES = [
   "All",
@@ -23,14 +34,13 @@ export default function TradePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  // Estados para el Formulario de Venta
   const [isSellOpen, setIsSellOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({ title: '', price: '', category: 'Electronics & Hardware', description: '', phone: '' })
 
-  // Estado para ver Detalles del Producto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
+  const [productToDelete, setProductToDelete] = useState<string | null>(null)
 
   const fetchProducts = async () => {
     try {
@@ -79,7 +89,8 @@ export default function TradePage() {
         price: parseFloat(formData.price),
         category: formData.category,
         contact_phone: formData.phone.trim(),
-        image_url: imageUrl
+        image_url: imageUrl,
+        status: 'PENDING'
       })
 
       if (error) throw error
@@ -88,45 +99,43 @@ export default function TradePage() {
       setFormData({ title: '', price: '', category: 'Electronics & Hardware', description: '', phone: '' })
       setImageFile(null)
       fetchProducts()
-    } catch (error: any) { alert("Error publishing product: " + error.message) } finally { setIsSubmitting(false) }
+      toast.add({ title: "Product Submitted", description: "Your product is pending approval.", type: "success" })
+    } catch (error: any) { toast.add({ title: "Error", description: "Error publishing product.", type: "error" }) } finally { setIsSubmitting(false) }
   }
 
   const openWhatsApp = (product: any) => {
-    // Limpiar el número de teléfono (deja solo los números)
     const cleanPhone = product.contact_phone?.replace(/\D/g, '') || ''
-    const message = encodeURIComponent(`Hola ${product.seller?.nombre}, vengo de UNET-Trade y estoy interesado en: "${product.title}" que tienes en venta por $${product.price}. ¿Aún está disponible?`)
+    const message = encodeURIComponent(`Hi, I'm interested in your product "${product.title}" listed on UNET Trade. Is it still available?`)
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank')
   }
 
-  const handleDeleteProduct = async (productId: string, imageUrl: string | null) => {
-    const isConfirmed = window.confirm("¿Estás seguro de que deseas eliminar este producto?")
-    if (!isConfirmed) return
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return
 
     try {
-      // 1. Borrar la imagen del storage si existe
-      if (imageUrl) {
-        // Extraemos la ruta exacta del archivo desde la URL pública
-        const filePath = imageUrl.split('/products/')[1]
+      const product = products.find(p => p.id === productToDelete)
+      
+      if (product?.image_url) {
+        const filePath = product.image_url.split('/products/')[1]
         if (filePath) {
           await supabase.storage.from('products').remove([filePath])
         }
       }
 
-      // 2. Borrar el registro de la base de datos
-      const { error } = await supabase.from('products').delete().eq('id', productId)
+      const { error } = await supabase.from('products').delete().eq('id', productToDelete)
       if (error) throw error
 
-      // 3. Actualizar la interfaz
-      setProducts(prev => prev.filter(p => p.id !== productId))
+      setProducts(prev => prev.filter(p => p.id !== productToDelete))
       setSelectedProduct(null)
     } catch (error: any) {
-      alert("Error al eliminar el producto: " + error.message)
+      toast.add({ title: "Error", description: "Error deleting product.", type: "error" })
+    } finally {
+      setProductToDelete(null)
     }
   }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
-      {/* CABECERA */}
       <div className="bg-card border-b border-border sticky top-16 z-30 px-4 py-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex items-center gap-2 w-full md:w-auto">
@@ -138,7 +147,6 @@ export default function TradePage() {
             <input type="text" placeholder="Search items or services..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
 
-          {/* BOTÓN Y MODAL DE VENTA */}
           {currentUserId && (
             <Dialog open={isSellOpen} onOpenChange={setIsSellOpen}>
               <DialogTrigger className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors outline-none">
@@ -197,7 +205,6 @@ export default function TradePage() {
           )}
         </div>
 
-        {/* FILTROS */}
         <div className="max-w-7xl mx-auto mt-4 flex gap-2 overflow-x-auto hide-scrollbar pb-2">
           {CATEGORIES.map(category => (
             <button key={category} onClick={() => setActiveCategory(category)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${activeCategory === category ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/50'}`}>
@@ -207,7 +214,6 @@ export default function TradePage() {
         </div>
       </div>
 
-      {/* GRID DE PRODUCTOS */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
@@ -243,8 +249,7 @@ export default function TradePage() {
         )}
       </div>
 
-      {/* MODAL DE DETALLES DEL PRODUCTO */}
-      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+      <Dialog open={!!selectedProduct && !productToDelete} onOpenChange={(open) => !open && setSelectedProduct(null)}>
         <DialogContent className="sm:max-w-[500px] bg-card border-border p-0 overflow-hidden">
           {selectedProduct && (
             <div className="flex flex-col">
@@ -274,10 +279,9 @@ export default function TradePage() {
                   </div>
                 </div>
 
-                {/* BOTONES DE ACCIÓN: Dueño vs Comprador */}
                 {selectedProduct.seller_id === currentUserId ? (
                   <button 
-                    onClick={() => handleDeleteProduct(selectedProduct.id, selectedProduct.image_url)}
+                    onClick={() => setProductToDelete(selectedProduct.id)}
                     className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
                   >
                     <Trash2 size={20} />
@@ -297,6 +301,23 @@ export default function TradePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this item? It will be permanently removed from UNET Trade.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteProduct} className="bg-red-500 hover:bg-red-600 text-white">
+              Delete Item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

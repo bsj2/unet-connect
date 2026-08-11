@@ -2,10 +2,13 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Heart, MessageCircle, Share2, Music, Loader2, Play, Plus, Upload, Video, Check, Send } from 'lucide-react'
+import { Heart, MessageCircle, Share2, Music, Loader2, Play, Plus, Upload, Video, Check, Send, Reply, X, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useSearchParams } from 'next/navigation'
+import { containsInappropriateContent } from '@/lib/moderation' // <-- Importamos moderación
+import { toast } from '@/components/ui/toast'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 function ClipsContent() {
   const searchParams = useSearchParams()
@@ -33,13 +36,13 @@ function ClipsContent() {
           users (id, nombre, apellido, avatar_url),
           audios (title, artist),
           clip_likes (user_id),
-          clip_comments (id, content, created_at, user_id, users(nombre, apellido, avatar_url))
+          clip_comments (id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url))
         `)
 
       if (error) throw error
 
       if (data) {
-        // Calcular engagement
+        // engagement algorithm: E = (L * 2) + (C * 3) + (S * 5) - (deltaT * 1.5)
         let scoredClips = data.map(clip => {
           const L = clip.clip_likes?.length || 0
           const C = clip.clip_comments?.length || 0
@@ -54,10 +57,10 @@ function ClipsContent() {
           return { ...clip, engagementScore: E, likes_count: L, comments_count: C }
         })
 
-        // Ordenar por engagement
+        // sort by engagement score descending
         scoredClips.sort((a, b) => b.engagementScore - a.engagementScore)
 
-        // Si entramos por un link compartido, forzar ese clip de primero
+        // if there's a shared clip ID in the URL, move that clip to the top of the list
         if (sharedClipId) {
           const sharedClipIndex = scoredClips.findIndex(c => c.id === sharedClipId)
           if (sharedClipIndex > -1) {
@@ -79,9 +82,18 @@ function ClipsContent() {
     fetchAndSortClips()
   }, [])
 
-  // ... (MANTÉN TU FUNCIÓN handleUpload EXACTAMENTE IGUAL AQUÍ) ...
   const handleUpload = async () => {
     if (!currentUserId || !videoFile) return
+
+    if (caption.trim() && containsInappropriateContent(caption)) {
+      toast.add({
+        title: "Inappropriate Content",
+        description: "Your caption contains inappropriate language. Please keep it academic and respectful.",
+        type: "warning",
+      })
+      return
+    }
+
     setIsUploading(true)
     try {
       const fileExt = videoFile.name.split('.').pop()
@@ -94,17 +106,15 @@ function ClipsContent() {
       const { error: clipError } = await supabase.from('clips').insert({ user_id: currentUserId, video_url: videoUrl, content: caption.trim(), audio_id: audioData.id })
       if (clipError) throw clipError
       setVideoFile(null); setCaption(''); setAudioTitle(''); setIsUploadOpen(false); fetchAndSortClips()
-    } catch (error: any) { alert("Error: " + error.message) } finally { setIsUploading(false) }
+    } catch (error: any) { toast.add({ title: "Error", description: "Error: " + error.message, type: "error" }) } finally { setIsUploading(false) }
   }
 
   if (loading) return <div className="h-[calc(100vh-4rem)] flex justify-center items-center bg-black"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>
 
   return (
     <>
-      {/* Botón de Subida */}
       {currentUserId && (
         <div className="fixed top-20 right-4 sm:right-8 z-50">
-           {/* ... (MANTÉN TU MODAL DE SUBIDA EXACTAMENTE IGUAL) ... */}
            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
             <DialogTrigger>
               <button className="bg-primary hover:bg-primary/90 text-primary-foreground p-3 sm:px-4 sm:py-2 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center gap-2">
@@ -144,26 +154,28 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   
-  // Interacciones
+  // interactions
   const [hasLiked, setHasLiked] = useState(clip.clip_likes?.some((l: any) => l.user_id === currentUserId) || false)
   const [likesCount, setLikesCount] = useState<number>(clip.likes_count || 0)
   const [copied, setCopied] = useState(false)
   
-  // Comentarios
+  // comments
   const [showComments, setShowComments] = useState(false)
-  const [comments, setComments] = useState(clip.clip_comments || [])
+  const [comments, setComments] = useState<any[]>(clip.clip_comments || [])
+  
   const [newComment, setNewComment] = useState('')
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null)
 
-  // Intersection Observer para AutoPlay y Cambio Dinámico de URL
+  // Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Actualizar URL dinámicamente sin recargar
             window.history.replaceState(null, '', `/clips?id=${clip.id}`)
-            
             if (videoRef.current) {
               videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
             }
@@ -211,27 +223,164 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
       const url = `${window.location.origin}/clips?id=${clip.id}`
       await navigator.clipboard.writeText(url)
       
-      // Incrementar share_count en la BD visualmente (opcional)
-      await supabase.rpc('increment_clip_shares', { row_id: clip.id }) // Si tienes esta función, si no, lo dejamos solo como UI
+      await supabase.rpc('increment_clip_shares', { row_id: clip.id }) 
 
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) { console.error(err) }
   }
 
-  const submitComment = async (e: React.FormEvent) => {
+  const submitComment = async (e: React.FormEvent, parentId: string | null = null) => {
     e.preventDefault()
-    if (!currentUserId || !newComment.trim() || isSubmitting) return
+    if (!currentUserId || isSubmitting) return
+
+    const textToSubmit = parentId ? replyText.trim() : newComment.trim()
+    if (!textToSubmit) return
+
+    if (containsInappropriateContent(textToSubmit)) {
+      toast.add({
+        title: "Inappropriate Content",
+        description: "Your comment contains inappropriate language. Please keep it academic and respectful.",
+        type: "warning",
+      })
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      const { data, error } = await supabase.from('clip_comments').insert({ clip_id: clip.id, user_id: currentUserId, content: newComment.trim() }).select().single()
+      const { data, error } = await supabase
+        .from('clip_comments')
+        .insert({ 
+          clip_id: clip.id, 
+          user_id: currentUserId, 
+          content: textToSubmit,
+          parent_id: parentId
+        })
+        .select('id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url)')
+        .single()
+
       if (error) throw error
       if (data) {
-        const { data: userData } = await supabase.from('users').select('nombre, apellido, avatar_url').eq('id', currentUserId).single()
-        setComments([...comments, { ...data, users: userData || { nombre: 'You', apellido: '' } }])
-        setNewComment('')
+        setComments([...comments, data])
+        if (parentId) {
+          setReplyText('')
+          setReplyingTo(null)
+        } else {
+          setNewComment('')
+        }
       }
-    } catch (error) { console.error(error) } finally { setIsSubmitting(false) }
+    } catch (error: any) { toast.add({ title: "Error", description: "Error submitting comment: " + error.message, type: "error" }) } finally { setIsSubmitting(false) }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    setCommentToDelete(commentId)
+  }
+
+  const confirmDeleteComment = async () => {
+  if (!commentToDelete) return
+  
+  try {
+    const { error } = await supabase.from('clip_comments').delete().eq('id', commentToDelete)
+    if (error) throw error
+    setComments(prev => prev.filter(c => c.id !== commentToDelete && c.parent_id !== commentToDelete))
+  } catch (error: any) {
+    toast.add({ title: "Error", description: "Error deleting comment: " + error.message, type: "error" })
+  } finally {
+    setCommentToDelete(null)
+  }
+}
+
+  const topLevelComments = comments.filter((c: any) => !c.parent_id)
+
+  const renderCommentNode = (comment: any, isReply: boolean = false) => {
+    const replies = comments.filter((c: any) => c.parent_id === comment.id)
+    const isCommentAuthor = currentUserId === comment.user_id
+
+    return (
+      <div key={comment.id} className={`${isReply ? 'ml-7 sm:ml-9 mt-3 border-l-2 border-border pl-3' : 'mt-4'}`}>
+        <div className="flex gap-3 text-sm group/comment">
+          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center overflow-hidden flex-shrink-0 mt-0.5">
+            {comment.users?.avatar_url ? <img src={comment.users.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-white">{comment.users?.nombre?.charAt(0)}</span>}
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-semibold text-foreground">{comment.users?.nombre}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{new Date(comment.created_at).toLocaleDateString()}</span>
+                </div>
+                <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+              </div>
+              
+              {isCommentAuthor && (
+                <button 
+                  onClick={() => handleDeleteComment(comment.id)} 
+                  className="text-muted-foreground hover:text-destructive transition-colors p-1 opacity-0 group-hover/comment:opacity-100" 
+                  title="Delete comment"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+            
+            <div className="mt-1 flex items-center gap-4">
+              <button 
+                onClick={() => { setReplyingTo(replyingTo === comment.id ? null : comment.id); setReplyText('') }}
+                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              >
+                <Reply size={12} /> Reply
+              </button>
+            </div>
+
+            {replyingTo === comment.id && currentUserId && (
+              <form onSubmit={(e) => submitComment(e, comment.id)} className="flex gap-2 mt-3 mb-2 relative animate-in fade-in zoom-in-95">
+                <input
+                  type="text"
+                  autoFocus
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`Replying to ${comment.users?.nombre}...`}
+                  className="flex-1 bg-muted border border-border rounded-full px-4 py-1.5 text-sm focus:outline-none focus:border-primary pr-16"
+                  disabled={isSubmitting}
+                />
+                <button type="button" onClick={() => setReplyingTo(null)} className="absolute right-9 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground">
+                  <X size={14} />
+                </button>
+                <button type="submit" disabled={!replyText.trim() || isSubmitting} className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 disabled:opacity-50">
+                  <Send size={14} />
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+        
+        {replies.length > 0 && (
+          <div className="mt-1">
+            {replies.map((reply: any) => renderCommentNode(reply, true))}
+          </div>
+        )}
+
+        <AlertDialog open={!!commentToDelete} onOpenChange={() => setCommentToDelete(null)}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete Comment</AlertDialogTitle>
+      <AlertDialogDescription>
+        Are you sure you want to delete this comment? This action cannot be undone.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction 
+        onClick={confirmDeleteComment} 
+        className="bg-red-500 hover:bg-red-600 text-white"
+      >
+        Delete
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+      </div>
+    )
   }
 
   return (
@@ -270,7 +419,7 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
               <span className="text-white text-xs font-semibold drop-shadow-md">{likesCount}</span>
             </button>
 
-            {/* BOTÓN Y MODAL DE COMENTARIOS */}
+            {/* comment button */}
             <Dialog open={showComments} onOpenChange={setShowComments}>
               <DialogTrigger>
                 <button className="flex flex-col items-center gap-1 group">
@@ -280,22 +429,31 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
                   <span className="text-white text-xs font-semibold drop-shadow-md">{comments.length}</span>
                 </button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[400px] h-[60vh] flex flex-col bg-card">
+              <DialogContent className="sm:max-w-[500px] h-[75vh] flex flex-col bg-card border-border">
                 <DialogHeader><DialogTitle>Comments</DialogTitle></DialogHeader>
-                <div className="flex-1 overflow-y-auto space-y-4 py-4 hide-scrollbar">
-                  {comments.length === 0 ? <p className="text-center text-muted-foreground text-sm">No comments yet.</p> : comments.map((comment: any) => (
-                    <div key={comment.id} className="flex gap-3 text-sm">
-                      <div className="w-8 h-8 rounded-full bg-primary flex-shrink-0 overflow-hidden">{comment.users?.avatar_url ? <img src={comment.users.avatar_url} className="w-full h-full object-cover"/> : <span className="w-full h-full flex items-center justify-center text-white font-bold">{comment.users?.nombre?.charAt(0)}</span>}</div>
-                      <div>
-                        <span className="font-semibold block">{comment.users?.nombre}</span>
-                        <span className="text-foreground/90">{comment.content}</span>
-                      </div>
-                    </div>
-                  ))}
+                
+                <div className="flex-1 overflow-y-auto space-y-2 py-4 hide-scrollbar">
+                  {comments.length === 0 ? (
+                    <p className="text-center text-muted-foreground text-sm py-4">No comments yet. Be the first to comment!</p>
+                  ) : (
+                    topLevelComments.map((comment: any) => renderCommentNode(comment))
+                  )}
                 </div>
-                <form onSubmit={submitComment} className="mt-auto border-t border-border pt-4 flex gap-2">
-                  <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add comment..." className="flex-1 bg-muted rounded-full px-4 py-2 text-sm outline-none" disabled={isSubmitting}/>
-                  <button type="submit" disabled={isSubmitting || !newComment.trim()} className="bg-primary text-primary-foreground p-2 rounded-full disabled:opacity-50"><Send size={18}/></button>
+
+                <form onSubmit={(e) => submitComment(e, null)} className="mt-auto border-t border-border pt-4 flex gap-2 relative">
+                  <input 
+                    type="text" 
+                    value={newComment} 
+                    onChange={e => setNewComment(e.target.value)} 
+                    placeholder="Add a comment..." 
+                    className="flex-1 bg-muted border border-border rounded-full px-4 py-2.5 text-sm outline-none pr-12 focus:ring-1 focus:ring-primary" 
+                    disabled={isSubmitting}
+                  />
+                  {newComment.trim() && (
+                    <button type="submit" disabled={isSubmitting} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-primary font-semibold text-sm hover:text-primary/80 disabled:opacity-50">
+                      Post
+                    </button>
+                  )}
                 </form>
               </DialogContent>
             </Dialog>

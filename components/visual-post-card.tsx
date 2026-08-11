@@ -1,15 +1,18 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { MessageCircle, MapPin, ChevronLeft, ChevronRight, Trash2, Heart, Share2, Check } from 'lucide-react'
+import { MessageCircle, MapPin, ChevronLeft, ChevronRight, Trash2, Heart, Share2, Check, Reply, X, Send, Flag, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { containsInappropriateContent } from '@/lib/moderation' 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import Link from 'next/link'
+import { toast } from './ui/toast'
 
 interface VisualPostCardProps {
   post: any
   currentUserId: string | null
   onDelete?: (id: string) => void
-  layout?: 'vertical' | 'horizontal' // <-- Nuevo prop
+  layout?: 'vertical' | 'horizontal' 
 }
 
 const REACTION_TYPES = {
@@ -23,7 +26,6 @@ function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
   if (diffInSeconds < 60) return `${diffInSeconds}s`
   const diffInMinutes = Math.floor(diffInSeconds / 60)
   if (diffInMinutes < 60) return `${diffInMinutes}m`
@@ -47,11 +49,17 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
   const touchTimer = useRef<NodeJS.Timeout | null>(null)
 
   const [comments, setComments] = useState<any[]>(post.comments || [])
-  // En horizontal, los comentarios siempre están visibles
   const [showComments, setShowComments] = useState(isHorizontal) 
   const [newComment, setNewComment] = useState('')
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const [copied, setCopied] = useState(false)
+
+  const [showReportDialog, setShowReportDialog] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [isReporting, setIsReporting] = useState(false)
 
   const isAuthor = currentUserId === post.user_id
 
@@ -60,8 +68,7 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
 
   const handleReact = async (type: string = 'ME_GUSTA') => {
     if (!currentUserId || isReacting) return
-    setIsReacting(true)
-    setIsHoveringReaction(false)
+    setIsReacting(true); setIsHoveringReaction(false)
     try {
       if (myReaction && myReaction.reaction_type === type) {
         await supabase.from('reactions').delete().eq('id', myReaction.id)
@@ -73,41 +80,67 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
         const { data } = await supabase.from('reactions').insert({ post_id: post.id, user_id: currentUserId, reaction_type: type }).select().single()
         if (data) setReactions([...reactions, data])
       }
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setIsReacting(false)
-    }
+    } catch (error) { console.error(error) } finally { setIsReacting(false) }
   }
 
   const handleTouchStart = () => { touchTimer.current = setTimeout(() => setIsHoveringReaction(true), 400) }
   const handleTouchEnd = () => { if (touchTimer.current) clearTimeout(touchTimer.current) }
 
-  const submitComment = async (e: React.FormEvent) => {
+  const submitComment = async (e: React.FormEvent, parentId: string | null = null) => {
     e.preventDefault()
-    if (!currentUserId || !newComment.trim() || isSubmitting) return
+    if (!currentUserId || isSubmitting) return
+
+    const textToSubmit = parentId ? replyText.trim() : newComment.trim()
+    if (!textToSubmit) return
+
+    if (containsInappropriateContent(textToSubmit)) {
+      toast.add({ title: "Inappropriate Content", description: "Your comment contains inappropriate content. Please revise it.", type: "warning" })
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      const { data, error } = await supabase.from('comments').insert({ post_id: post.id, user_id: currentUserId, content: newComment.trim() }).select()
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({ post_id: post.id, user_id: currentUserId, content: textToSubmit, parent_id: parentId })
+        .select('id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url)')
+      
       if (error) throw error
       if (data) {
-        const { data: userData } = await supabase.from('users').select('nombre, apellido, avatar_url').eq('id', currentUserId).single()
-        setComments([...comments, { ...data[0], users: userData || { nombre: 'You', apellido: '' } }])
-        setNewComment('')
+        setComments([...comments, data[0]])
+        if (parentId) { setReplyText(''); setReplyingTo(null) } else { setNewComment('') }
       }
-    } catch (error) { console.error(error) } finally { setIsSubmitting(false) }
+    } catch (error: any) { toast.add({ title: "Error", description: "Error submitting comment: " + error.message, type: "error" }) } finally { setIsSubmitting(false) }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    const isConfirmed = window.confirm("Are you sure you want to delete this comment?")
+    if (!isConfirmed) return
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', commentId)
+      if (error) throw error
+      setComments(prev => prev.filter(c => c.id !== commentId && c.parent_id !== commentId))
+    } catch (error: any) { toast.add({ title: "Error", description: "Error deleting comment: " + error.message, type: "error" }) }
   }
 
   const handleShare = async () => {
     try {
       const url = `${window.location.origin}/p/${post.id}`
       await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopied(true); setTimeout(() => setCopied(false), 2000)
     } catch (err) { console.error(err) }
   }
 
-  // --- COMPONENTES INTERNOS DE RENDERIZADO ---
+  const handleReport = async () => {
+    if (!currentUserId || !reportReason.trim() || isReporting) return
+    setIsReporting(true)
+    try {
+      const { error } = await supabase.from('reports').insert({ reporter_id: currentUserId, post_id: post.id, reason: reportReason.trim() })
+      if (error) throw error
+      toast.add({ title: "Post Reported", description: "Post reported successfully. Our admins will review it.", type: "success" })
+      setShowReportDialog(false); setReportReason('')
+    } catch (error: any) { toast.add({ title: "Error", description: "Error reporting post: " + error.message, type: "error" }) } finally { setIsReporting(false) }
+  }
 
   const renderHeader = () => (
     <div className={`p-4 flex items-center justify-between ${isHorizontal ? 'border-b border-border' : ''}`}>
@@ -124,8 +157,12 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
       </div>
       <div className="flex items-center gap-3">
         {!isHorizontal && <span className="text-xs text-muted-foreground font-medium mr-2">{formatTimeAgo(post.created_at)}</span>}
-        {isAuthor && onDelete && (
-          <button onClick={() => onDelete(post.id)} className="p-2 text-muted-foreground hover:text-red-500 rounded-full transition-colors"><Trash2 size={16} /></button>
+        {currentUserId && (
+          isAuthor && onDelete ? (
+            <button onClick={() => onDelete(post.id)} className="p-2 text-muted-foreground hover:text-red-500 rounded-full transition-colors"><Trash2 size={16} /></button>
+          ) : (
+            <button onClick={() => setShowReportDialog(true)} className="p-2 text-muted-foreground hover:text-orange-500 rounded-full transition-colors"><Flag size={16} /></button>
+          )
         )}
       </div>
     </div>
@@ -179,76 +216,111 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
   const renderContent = () => (
     <>
       {(post.content || (post.hashtags && post.hashtags.length > 0)) && (
-        <div className="text-sm mb-4 text-foreground flex gap-3">
-          <Link href={`/profile/${post.user_id}`} className="w-7 h-7 rounded-full bg-primary flex items-center justify-center overflow-hidden flex-shrink-0 mt-0.5">
-            {post.users?.avatar_url ? <img src={post.users.avatar_url} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-white">{post.users?.nombre?.charAt(0)}</span>}
-          </Link>
-          <div className="flex-1">
-            <span className="font-semibold mr-2">{post.users?.nombre}</span>
-            <span className="whitespace-pre-wrap">{post.content}</span>
-            {post.hashtags && post.hashtags.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {post.hashtags.map((tag: string, idx: number) => (
-                  <Link key={idx} href={`/search?q=${encodeURIComponent(tag)}`} className="text-primary hover:underline font-medium">#{tag}</Link>
-                ))}
-              </div>
-            )}
-            {isHorizontal && <div className="text-xs text-muted-foreground font-medium mt-1">{formatTimeAgo(post.created_at)}</div>}
-          </div>
+        <div className="mb-4 text-foreground text-sm">
+          <span className="font-semibold mr-2">{post.users?.nombre} {post.users?.apellido}</span>
+          <span className="whitespace-pre-wrap">{post.content}</span>
+          {post.hashtags && post.hashtags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {post.hashtags.map((tag: string, idx: number) => (
+                <Link key={idx} href={`/search?q=${encodeURIComponent(tag)}`} className="text-primary hover:underline font-medium text-sm">#{tag}</Link>
+              ))}
+            </div>
+          )}
+          {isHorizontal && <div className="text-xs text-muted-foreground font-medium mt-2">{formatTimeAgo(post.created_at)}</div>}
         </div>
       )}
     </>
   )
 
-  const renderCommentsList = () => (
-    <div className={`space-y-4 ${isHorizontal ? 'pb-2' : 'mb-4 max-h-60 overflow-y-auto hide-scrollbar'}`}>
-      {comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-2">No comments yet. Be the first!</p>
-      ) : (
-        comments.map((comment) => (
-          <div key={comment.id} className="flex gap-3 text-sm">
-            <Link href={`/profile/${comment.user_id}`} className="w-7 h-7 rounded-full bg-primary flex items-center justify-center overflow-hidden flex-shrink-0 mt-0.5">
-              {comment.users?.avatar_url ? <img src={comment.users.avatar_url} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-white">{comment.users?.nombre?.charAt(0)}</span>}
-            </Link>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Link href={`/profile/${comment.user_id}`} className="font-semibold text-foreground hover:underline">{comment.users?.nombre}</Link>
-                <span className="text-xs text-muted-foreground font-medium">{formatTimeAgo(comment.created_at)}</span>
+  const topLevelComments = comments.filter(c => !c.parent_id)
+  const renderCommentNode = (comment: any, isReply: boolean = false) => {
+    const replies = comments.filter(c => c.parent_id === comment.id)
+    const isCommentAuthor = currentUserId === comment.user_id
+    return (
+      <div key={comment.id} className={`${isReply ? 'ml-7 sm:ml-9 mt-3 border-l-2 border-border pl-3' : 'mt-4'}`}>
+        <div className="flex gap-3 text-sm group/comment">
+          <Link href={`/profile/${comment.user_id}`} className="w-7 h-7 rounded-full bg-primary flex items-center justify-center overflow-hidden flex-shrink-0 mt-0.5">
+            {comment.users?.avatar_url ? <img src={comment.users.avatar_url} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-white">{comment.users?.nombre?.charAt(0)}</span>}
+          </Link>
+          <div className="flex-1">
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Link href={`/profile/${comment.user_id}`} className="font-semibold text-foreground hover:underline">{comment.users?.nombre}</Link>
+                  <span className="text-xs text-muted-foreground font-medium">{formatTimeAgo(comment.created_at)}</span>
+                </div>
+                <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
               </div>
-              <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+              {isCommentAuthor && (
+                <button onClick={() => handleDeleteComment(comment.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1 opacity-0 group-hover/comment:opacity-100" title="Delete comment"><Trash2 size={14} /></button>
+              )}
             </div>
+            <div className="mt-1 flex items-center gap-4">
+              <button onClick={() => { setReplyingTo(replyingTo === comment.id ? null : comment.id); setReplyText('') }} className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"><Reply size={12} /> Reply</button>
+            </div>
+            {replyingTo === comment.id && currentUserId && (
+              <form onSubmit={(e) => submitComment(e, comment.id)} className="flex gap-2 mt-3 mb-2 relative animate-in fade-in zoom-in-95">
+                <input type="text" autoFocus value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Replying to ${comment.users?.nombre}...`} className="flex-1 bg-muted border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary pr-16" disabled={isSubmitting}/>
+                <button type="button" onClick={() => setReplyingTo(null)} className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"><X size={14} /></button>
+                <button type="submit" disabled={!replyText.trim() || isSubmitting} className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 disabled:opacity-50"><Send size={14} /></button>
+              </form>
+            )}
           </div>
-        ))
-      )}
+        </div>
+        {replies.length > 0 && <div className="mt-1">{replies.map(reply => renderCommentNode(reply, true))}</div>}
+      </div>
+    )
+  }
+
+  const renderCommentsList = () => (
+    <div className={`space-y-1 ${isHorizontal ? 'pb-2' : 'mb-4 max-h-60 overflow-y-auto hide-scrollbar'}`}>
+      {comments.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No comments yet. Be the first!</p> : topLevelComments.map(comment => renderCommentNode(comment))}
     </div>
   )
 
   const renderCommentInput = () => (
-    <form onSubmit={submitComment} className={`flex gap-2 relative ${isHorizontal ? '' : 'mt-2 border-t border-border pt-4'}`}>
+    <form onSubmit={(e) => submitComment(e, null)} className={`flex gap-2 relative ${isHorizontal ? '' : 'mt-2 border-t border-border pt-4'}`}>
       <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-transparent border-b border-border py-2 text-sm focus:outline-none focus:border-primary transition-colors pr-12 text-foreground placeholder:text-muted-foreground" disabled={isSubmitting} />
-      {newComment.trim() && (
-        <button type="submit" disabled={isSubmitting} className="absolute right-0 top-1/2 -translate-y-1/2 text-primary font-semibold text-sm hover:text-primary/80">Post</button>
-      )}
+      {newComment.trim() && <button type="submit" disabled={isSubmitting} className="absolute right-0 top-1/2 -translate-y-1/2 text-primary font-semibold text-sm hover:text-primary/80">Post</button>}
     </form>
   )
 
-// --- ESTRUCTURA HORIZONTAL (MODAL PC) ---
+  const renderReportModal = () => (
+    <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader><DialogTitle>Report Post</DialogTitle></DialogHeader>
+        <div className="py-4">
+          <label className="text-sm font-medium mb-2 block">Why are you reporting this post?</label>
+          <select 
+            value={reportReason} 
+            onChange={(e) => setReportReason(e.target.value)}
+            className="w-full bg-muted border border-border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary appearance-none"
+          >
+            <option value="">Select a reason...</option>
+            <option value="Spam or inappropriate advertising">Spam or inappropriate advertising</option>
+            <option value="Offensive or non-academic language">Offensive or non-academic language</option>
+            <option value="Harassment or bullying">Harassment or bullying</option>
+            <option value="Misinformation">Misinformation</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <DialogFooter>
+          <button onClick={() => setShowReportDialog(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">Cancel</button>
+          <button onClick={handleReport} disabled={!reportReason || isReporting} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+            {isReporting && <Loader2 className="w-4 h-4 animate-spin" />} Submit Report
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   if (isHorizontal) {
     return (
       <div className="flex flex-col md:flex-row w-full h-full bg-card overflow-hidden text-left">
-        
-        {/* CAMBIO AQUÍ: Añadimos flex, flex-col y h-full al contenedor padre de la imagen */}
-        <div className="bg-black min-h-[40vh] md:min-h-0 flex flex-col relative h-full">
-          {renderCarousel()}
-        </div>
-
+        <div className="bg-black min-h-[40vh] md:min-h-0 flex flex-col relative h-full">{renderCarousel()}</div>
         <div className="w-full md:w-[400px] flex flex-col border-l border-border bg-card h-full">
-          {/* ... (el resto queda igual) */}
           {renderHeader()}
-          <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
-            {renderContent()}
-            {renderCommentsList()}
-          </div>
+          <div className="flex-1 overflow-y-auto hide-scrollbar p-4">{renderContent()}{renderCommentsList()}</div>
           <div className="p-4 border-t border-border mt-auto">
             {renderInteractions()}
             {reactions.length > 0 && <p className="text-sm font-semibold mb-2 text-foreground">{reactions.length} {reactions.length === 1 ? 'reaction' : 'reactions'}</p>}
@@ -256,11 +328,11 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
             {renderCommentInput()}
           </div>
         </div>
+        {renderReportModal()}
       </div>
     )
   }
 
-  // --- ESTRUCTURA VERTICAL (FEED/MÓVIL) ---
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-6 text-left flex flex-col">
       {renderHeader()}
@@ -269,13 +341,9 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
         {renderInteractions()}
         {reactions.length > 0 && <p className="text-sm font-semibold mb-2 text-foreground">{reactions.length} {reactions.length === 1 ? 'reaction' : 'reactions'}</p>}
         {renderContent()}
-        {showComments && (
-          <>
-            {renderCommentsList()}
-            {renderCommentInput()}
-          </>
-        )}
+        {showComments && <>{renderCommentsList()}{renderCommentInput()}</>}
       </div>
+      {renderReportModal()}
     </div>
   )
 }

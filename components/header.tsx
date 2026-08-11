@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Bell, LogOut, Users, User as UserIcon, FileText, Library, Check, Heart, UserPlus, MessageCircle, Video, Store, Loader2 } from 'lucide-react';
+import { Search, Bell, LogOut, Users, User as UserIcon, FileText, Check, Heart, UserPlus, MessageCircle, Video, Store, Loader2, ShieldAlert } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,20 +16,20 @@ export function Header() {
   const [initials, setInitials] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  const [isAdmin, setIsAdmin] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   
-  // Estados para Búsqueda
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState({ users: [] as any[], posts: [] as any[], groups: [] as any[], clips: [] as any[], trade: [] as any[] });
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLFormElement>(null);
 
-  // Estados para Notificaciones
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Cerrar sugerencias al clic fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -40,7 +40,6 @@ export function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auth y Fetch Notificaciones
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -51,10 +50,16 @@ export function Header() {
         const a = session.user.user_metadata?.apellido || '';
         setInitials(`${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`);
         
+        const { data: userData } = await supabase.from('users').select('rol').eq('id', session.user.id).single();
+        if (userData?.rol === 'Professor' || userData?.rol === 'Staff') {
+          setIsAdmin(true);
+        }
+
         fetchNotifications(session.user.id);
       } else {
         setIsLoggedIn(false);
         setCurrentUserId(null);
+        setIsAdmin(false);
       }
       setLoading(false);
     };
@@ -67,11 +72,17 @@ export function Header() {
         const n = session.user.user_metadata?.nombre || '';
         const a = session.user.user_metadata?.apellido || '';
         setInitials(`${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`);
+        
+        supabase.from('users').select('rol').eq('id', session.user.id).single().then(({ data }) => {
+          if (data?.rol === 'Professor' || data?.rol === 'Staff') setIsAdmin(true);
+        });
+
         fetchNotifications(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setIsLoggedIn(false);
         setInitials('');
         setCurrentUserId(null);
+        setIsAdmin(false);
         setNotifications([]);
         setUnreadCount(0);
       }
@@ -104,7 +115,7 @@ export function Header() {
     } catch (error) { console.error(error) }
   };
 
-  // --- BÚSQUEDA EN TIEMPO REAL (PREVISUALIZACIÓN) ---
+  // --- REAL TIME SEARCH (PREVIEW) ---
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (searchQuery.trim().length < 2) { 
@@ -144,30 +155,30 @@ export function Header() {
 
   const handleSignOut = async () => await supabase.auth.signOut();
 
+  // Translated Notification Texts
   const renderNotificationContent = (notif: any) => {
     const senderName = `${notif.sender.nombre} ${notif.sender.apellido}`;
     switch (notif.type) {
-      case 'LIKE': return { icon: <Heart size={16} className="text-red-500" />, text: <span><strong>{senderName}</strong> le dio like a tu publicación.</span> };
-      case 'COMMENT': return { icon: <MessageCircle size={16} className="text-blue-500" />, text: <span><strong>{senderName}</strong> comentó en tu publicación.</span> };
-      case 'FRIEND_REQUEST': return { icon: <UserPlus size={16} className="text-green-500" />, text: <span><strong>{senderName}</strong> te envió una solicitud de amistad.</span> };
-      case 'FOLLOW': return { icon: <Users size={16} className="text-primary" />, text: <span><strong>{senderName}</strong> empezó a seguirte.</span> };
-      default: return { icon: <Bell size={16} />, text: <span>Nueva notificación de {senderName}</span> };
+      case 'LIKE': return { icon: <Heart size={16} className="text-red-500" />, text: <span><strong>{senderName}</strong> liked your post.</span> };
+      case 'COMMENT': return { icon: <MessageCircle size={16} className="text-blue-500" />, text: <span><strong>{senderName}</strong> commented on your post.</span> };
+      case 'FRIEND_REQUEST': return { icon: <UserPlus size={16} className="text-green-500" />, text: <span><strong>{senderName}</strong> sent you a friend request.</span> };
+      case 'FOLLOW': return { icon: <Users size={16} className="text-primary" />, text: <span><strong>{senderName}</strong> started following you.</span> };
+      default: return { icon: <Bell size={16} />, text: <span>New notification from {senderName}</span> };
     }
   };
 
-  // Helper para saber si hay resultados en general
   const hasSuggestions = suggestions.users.length > 0 || suggestions.posts.length > 0 || suggestions.groups.length > 0 || suggestions.clips.length > 0 || suggestions.trade.length > 0;
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-[50] flex items-center justify-between px-4 md:px-6">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-[60] flex items-center justify-between px-4 md:px-6">
       
-      {/* BUSCADOR CON DROPDOWN */}
-      <form ref={searchRef} onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden sm:flex items-center relative">
+      {/* DROPDOWN SEARCH - Made visible on mobile */}
+      <form ref={searchRef} onSubmit={handleSearchSubmit} className="flex-1 max-w-md flex items-center relative mr-3 sm:mr-0">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text" value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); setShowSuggestions(true);}} onFocus={() => setShowSuggestions(true)} placeholder="Search users, posts, groups, clips, trade..." className="w-full pl-10 pr-4 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground" autoComplete="off" />
           
-          {/* Menú Desplegable de Resultados */}
+          {/* SUGGESTIONS DROPDOWN */}
           {showSuggestions && searchQuery.trim().length >= 2 && (
             <div className="absolute top-full mt-2 w-full bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-[60vh] flex flex-col">
               {isSearching ? (
@@ -177,7 +188,7 @@ export function Header() {
               ) : (
                 <div className="overflow-y-auto hide-scrollbar">
                   
-                  {/* Usuarios */}
+                  {/* USERS */}
                   {suggestions.users.length > 0 && (
                     <div className="p-2">
                       <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><UserIcon size={12}/> Users</div>
@@ -192,7 +203,7 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Productos (Trade) */}
+                  {/* Products (Trade) */}
                   {suggestions.trade.length > 0 && (
                     <div className="p-2 border-t border-border">
                       <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Store size={12}/> Trade</div>
@@ -221,7 +232,7 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Posts & Grupos... */}
+                  {/* Posts & Groups... */}
                   {(suggestions.posts.length > 0 || suggestions.groups.length > 0) && (
                     <div className="p-2 border-t border-border">
                       {suggestions.groups.map(g => (
@@ -239,7 +250,7 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Botón Ver Todo */}
+                  {/* See All Results */}
                   <div className="p-2 border-t border-border bg-muted/30">
                     <button type="submit" className="w-full py-2 text-sm text-primary font-semibold hover:underline">
                       See all results for &quot;{searchQuery}&quot;
@@ -252,19 +263,17 @@ export function Header() {
         </div>
       </form>
 
-      {/* Resto del Header (Móvil y Menú derecho) */}
-      <div className="flex-1 flex justify-center md:hidden">
-        <span className="font-semibold text-foreground">Muro</span>
-      </div>
-
       <div className="flex items-center gap-2 sm:gap-4">
         {loading ? (
           <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
         ) : isLoggedIn && currentUserId ? (
           <>
-            <Link href="/groups" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground hidden sm:block">
-              <Library className="w-5 h-5" />
-            </Link>
+            {/* ADMIN PANEL */}
+            {isAdmin && (
+              <Link href="/admin" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-primary hover:text-primary/80 hidden sm:block" title="Admin Dashboard">
+                <ShieldAlert className="w-5 h-5" />
+              </Link>
+            )}
             
             <Link href="/friends" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground hidden sm:block">
               <Users className="w-5 h-5" />
@@ -286,7 +295,7 @@ export function Header() {
                 </div>
                 <div className="max-h-[350px] overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">No tienes notificaciones aún.</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">You don't have any notifications yet.</div>
                   ) : (
                     notifications.map(notif => {
                       const { icon, text } = renderNotificationContent(notif);

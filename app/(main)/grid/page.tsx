@@ -19,7 +19,6 @@ export default function GridPage() {
   useEffect(() => {
     const fetchGridPosts = async () => {
       try {
-        // Traemos solo los posts que tengan una imagen, ordenados por fecha
         const { data, error } = await supabase
           .from('posts')
           .select(`
@@ -47,7 +46,6 @@ export default function GridPage() {
     <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Encabezado */}
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-primary/10 rounded-xl text-primary">
             <Grid3X3 size={28} />
@@ -60,7 +58,6 @@ export default function GridPage() {
           </div>
         </div>
 
-        {/* Malla de imágenes (Grid) */}
         {loading ? (
           <div className="flex justify-center py-20 text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -79,7 +76,6 @@ export default function GridPage() {
                 className="relative aspect-square cursor-pointer group bg-muted overflow-hidden rounded-sm md:rounded-xl"
                 onClick={() => setSelectedPost(post)}
               >
-                {/* Imagen Cuadrada */}
                 <img 
                   src={post.image_url} 
                   alt="Post content" 
@@ -87,7 +83,6 @@ export default function GridPage() {
                   loading="lazy"
                 />
                 
-                {/* Overlay Oscuro al hacer Hover (Estilo Instagram) */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-6 text-white">
                   <div className="flex items-center gap-1.5 font-bold">
                     <Heart size={20} className="fill-white" />
@@ -104,7 +99,6 @@ export default function GridPage() {
         )}
       </div>
 
-      {/* Visor Modal de la Imagen */}
       <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black border-border shadow-2xl">
           <DialogHeader className="sr-only">
@@ -113,7 +107,6 @@ export default function GridPage() {
           
           {selectedPost && (
             <div className="flex flex-col md:flex-row max-h-[85vh]">
-              {/* Lado izquierdo: La imagen */}
               <div className="flex-1 bg-black flex items-center justify-center relative min-h-[300px] md:min-h-[500px]">
                 <img 
                   src={selectedPost.image_url} 
@@ -122,7 +115,6 @@ export default function GridPage() {
                 />
               </div>
               
-              {/* Lado derecho: Info del autor y descripción (oculto en móviles muy pequeños, visible en tablets/desktop) */}
               <div className="w-full md:w-80 bg-card p-4 flex flex-col border-l border-border max-h-[30vh] md:max-h-none overflow-y-auto">
                 <Link href={`/profile/${selectedPost.user_id}`} className="flex items-center gap-3 mb-4 hover:opacity-80 transition-opacity">
                   <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center overflow-hidden flex-shrink-0">

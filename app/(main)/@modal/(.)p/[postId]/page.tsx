@@ -9,7 +9,6 @@ import { VisualPostCard } from '@/components/visual-post-card'
 export default function PostModalIntercept() {
   const params = useParams()
   const router = useRouter()
-  // Usamos postId porque renombramos la carpeta
   const postId = params.postId as string 
   
   const [post, setPost] = useState<any | null>(null)
@@ -27,7 +26,7 @@ export default function PostModalIntercept() {
 
       const { data } = await supabase
         .from('posts')
-        .select(`*, users (nombre, apellido, avatar_url), comments (id, content, created_at, user_id, users(nombre, apellido, avatar_url)), reactions (id, user_id, reaction_type)`)
+        .select(`*, users (nombre, apellido, avatar_url), comments (id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url)), reactions (id, user_id, reaction_type)`)
         .eq('id', postId)
         .single()
         
@@ -40,13 +39,11 @@ export default function PostModalIntercept() {
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && router.back()}>
-      {/* Aumentamos el tamaño a max-w-5xl y ajustamos la altura */}
       <DialogContent className="sm:max-w-5xl p-0 overflow-hidden bg-background border-border shadow-2xl h-[90vh] flex flex-col hide-scrollbar">
         <DialogHeader className="sr-only">
           <DialogTitle>View Post</DialogTitle>
         </DialogHeader>
         
-        {/* Le indicamos a la tarjeta que use el diseño horizontal */}
         <VisualPostCard post={post} currentUserId={currentUserId} layout="horizontal" />
       </DialogContent>
     </Dialog>

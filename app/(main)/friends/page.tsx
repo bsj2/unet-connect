@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { Check, X, UserMinus, UserCheck, Users } from 'lucide-react'
 
-// Definimos un tipo para estructurar los datos que mostraremos
+// define the type for a connection item
 type ConnectionItem = {
   connectionId: string;
   user: {
@@ -22,7 +22,7 @@ export default function FriendsPage() {
   const [requests, setRequests] = useState<ConnectionItem[]>([])
   const [friends, setFriends] = useState<ConnectionItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // Para desactivar botones mientras cargan
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const fetchConnections = async () => {
     try {
@@ -30,7 +30,6 @@ export default function FriendsPage() {
       if (!session?.user) return
       const myId = session.user.id
 
-      // 1. Buscamos todas las conexiones de AMISTAD donde participemos
       const { data: connections, error } = await supabase
         .from('connections')
         .select('*')
@@ -46,10 +45,8 @@ export default function FriendsPage() {
         return
       }
 
-      // 2. Extraemos los IDs de las "otras" personas
       const userIds = connections.map(c => c.sender_id === myId ? c.receiver_id : c.sender_id)
 
-      // 3. Buscamos los datos de esos usuarios en la tabla users
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, nombre, apellido, avatar_url, rol, carrera')
@@ -57,7 +54,6 @@ export default function FriendsPage() {
 
       if (usersError) throw usersError
 
-      // 4. Clasificamos los resultados en Solicitudes (Recibidas) y Amigos (Aceptados)
       const requestsList: ConnectionItem[] = []
       const friendsList: ConnectionItem[] = []
 
@@ -76,7 +72,6 @@ export default function FriendsPage() {
         if (conn.status === 'ACCEPTED') {
           friendsList.push(item)
         } else if (conn.status === 'PENDING' && !isSender) {
-          // Solo mostramos en pendientes las que NOSOTROS recibimos
           requestsList.push(item)
         }
       })
@@ -94,12 +89,11 @@ export default function FriendsPage() {
     fetchConnections()
   }, [])
 
-  // --- ACCIONES ---
   const handleAccept = async (connectionId: string) => {
     setActionLoading(connectionId)
     try {
       await supabase.from('connections').update({ status: 'ACCEPTED' }).eq('id', connectionId)
-      fetchConnections() // Recargamos para actualizar las listas
+      fetchConnections()
     } catch (error) {
       console.error(error)
     } finally {
@@ -127,7 +121,6 @@ export default function FriendsPage() {
     <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
         
-        {/* Encabezado */}
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />
@@ -136,7 +129,6 @@ export default function FriendsPage() {
           <p className="text-muted-foreground mt-2">Manage your university network</p>
         </div>
 
-        {/* Sección 1: Solicitudes Pendientes */}
         {requests.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-foreground border-b border-border pb-2">
@@ -184,7 +176,6 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* Sección 2: Mis Amigos */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-foreground border-b border-border pb-2">
             My Friends ({friends.length})

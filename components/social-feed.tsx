@@ -63,7 +63,7 @@ export function SocialFeed() {
           *,
           users (nombre, apellido, rol, email, avatar_url),
           groups (id, name),
-          comments (id, content, created_at, user_id, users(nombre, apellido)),
+          comments (id, content, created_at, user_id, parent_id, users(nombre, apellido)),
           reactions (id, user_id)
         `)
         .order('created_at', { ascending: false })

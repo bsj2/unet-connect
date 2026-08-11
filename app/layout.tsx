@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { Toaster } from "@/components/ui/toast"
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="es" className="bg-background">
       <body className="antialiased flex min-h-screen flex-col">
         {children}
+        <Toaster />
       </body>
     </html>
   )

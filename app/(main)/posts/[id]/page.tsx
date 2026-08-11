@@ -10,7 +10,6 @@ import Link from 'next/link'
 export default function PostPage() {
   const params = useParams()
   const router = useRouter()
-  // Extraemos el ID de la URL
   const postId = params.id as string
 
   const [post, setPost] = useState<any>(null)
@@ -26,17 +25,16 @@ export default function PostPage() {
           setCurrentUserId(session.user.id)
         }
 
-        // Buscamos específicamente el post que coincida con el ID de la URL
         const { data, error } = await supabase
           .from('posts')
           .select(`
             *,
             users (nombre, apellido, rol, email),
-            comments (id, content, created_at, user_id, users(nombre, apellido)),
+            comments (id, content, created_at, user_id, parent_id, users(nombre, apellido)),
             reactions (id, user_id)
           `)
           .eq('id', postId)
-          .single() // .single() le dice a Supabase que esperamos 1 solo objeto, no un arreglo
+          .single()
 
         if (error) throw error
         if (data) setPost(data)
@@ -75,7 +73,6 @@ export default function PostPage() {
           </Link>
         </div>
         
-        {/* Reutilizamos el componente que ya diseñaste */}
         <PostCard
           post={post}
           currentUserId={currentUserId}

@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { toast } from './ui/toast'
 
 interface StoriesBarProps {
   currentUserId: string | null
@@ -22,7 +23,6 @@ interface StoriesBarProps {
 export function StoriesBar({ currentUserId }: StoriesBarProps) {
   const [groupedStories, setGroupedStories] = useState<any[]>([])
   
-  // Estados para "Mi Historia"
   const [myStories, setMyStories] = useState<any[]>([])
   const [myGroupFull, setMyGroupFull] = useState<any | null>(null)
   const [showOptionsDialog, setShowOptionsDialog] = useState(false)
@@ -30,11 +30,9 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
   const [loading, setLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   
-  // Estados para el visor interactivo de historias
   const [activeStoryGroup, setActiveStoryGroup] = useState<any | null>(null)
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0)
 
-  // Estado para confirmación de borrado
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   
@@ -81,7 +79,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
     fetchStories()
   }, [currentUserId])
 
-  // Resetear el índice a 0 cada vez que abrimos un grupo de historias nuevo
   useEffect(() => {
     if (activeStoryGroup) {
       setCurrentStoryIndex(0)
@@ -111,7 +108,7 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
 
       await fetchStories()
     } catch (error: any) {
-      alert("Error uploading story: " + error.message)
+      toast.add({ title: "Error", description: "Error uploading story: " + error.message, type: "error" })
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -128,7 +125,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
       const { error } = await supabase.from('stories').delete().eq('id', storyId)
       if (error) throw error
 
-      // Si era la única historia, cerramos el visor. Si no, ajustamos la vista actual.
       if (activeStoryGroup.stories.length <= 1) {
         setActiveStoryGroup(null)
       } else {
@@ -142,7 +138,7 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
 
       await fetchStories()
     } catch (error: any) {
-      alert("Error deleting story: " + error.message)
+      toast.add({ title: "Error", description: "Error deleting story: " + error.message, type: "error" })
     } finally {
       setIsDeleting(false)
       setShowDeleteDialog(false)
@@ -158,12 +154,11 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
     }
   }
 
-  // Navegación dentro del visor de historias
   const nextStory = () => {
     if (activeStoryGroup && currentStoryIndex < activeStoryGroup.stories.length - 1) {
       setCurrentStoryIndex(prev => prev + 1)
     } else {
-      setActiveStoryGroup(null) // Cierra el visor si ya no hay más historias
+      setActiveStoryGroup(null)
     }
   }
 
@@ -183,7 +178,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
     <>
       <div className="flex gap-4 overflow-x-auto pb-4 pt-2 hide-scrollbar px-2">
         
-        {/* MI HISTORIA */}
         <div className="flex flex-col items-center gap-1 min-w-[72px] cursor-pointer" onClick={handleMyStoryClick}>
           <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleUploadStory} disabled={isUploading} />
           
@@ -210,7 +204,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
           </span>
         </div>
 
-        {/* HISTORIAS DE OTROS USUARIOS */}
         {groupedStories.map((group, index) => (
           <div key={index} className="flex flex-col items-center gap-1 min-w-[72px] cursor-pointer group" onClick={() => setActiveStoryGroup(group)}>
             <div className="w-16 h-16 rounded-full flex items-center justify-center p-[2px] bg-gradient-to-tr from-yellow-400 to-fuchsia-600 hover:scale-105 transition-transform">
@@ -231,7 +224,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
         ))}
       </div>
 
-      {/* DIALOG DE OPCIONES PARA MI HISTORIA */}
       <Dialog open={showOptionsDialog} onOpenChange={setShowOptionsDialog}>
         <DialogContent className="sm:max-w-[300px]">
           <DialogHeader>
@@ -254,7 +246,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
         </DialogContent>
       </Dialog>
 
-      {/* VISOR DE HISTORIAS INTERACTIVO */}
       <Dialog open={!!activeStoryGroup} onOpenChange={(open) => !open && setActiveStoryGroup(null)}>
         <DialogContent className="max-w-md p-0 overflow-hidden bg-black border-border shadow-2xl h-[80vh] flex flex-col">
           <DialogHeader className="sr-only">
@@ -264,7 +255,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
           {activeStoryGroup && (
             <div className="flex-1 relative flex flex-col">
               
-              {/* Barras de progreso superiores */}
               <div className="absolute top-2 left-2 right-2 flex gap-1 z-50 pointer-events-none">
                 {activeStoryGroup.stories.map((_: any, idx: number) => (
                   <div 
@@ -276,10 +266,8 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
                 ))}
               </div>
 
-              {/* Cabecera (Botones X y Delete, y datos del usuario) */}
               <div className="absolute top-0 left-0 right-0 p-4 pt-6 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent z-50 pointer-events-none">
                 
-                {/* Info del usuario (Izquierda) */}
                 <div className="flex items-center gap-3 pointer-events-auto">
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-primary flex-shrink-0 border border-white/20">
                     {activeStoryGroup.user?.avatar_url ? (
@@ -298,7 +286,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
                   </span>
                 </div>
 
-                {/* Acciones (Derecha) */}
                 <div className="flex items-center gap-2 pointer-events-auto">
                   {isMyActiveStory && (
                     <button 
@@ -317,7 +304,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
                 </div>
               </div>
 
-              {/* Áreas de clic invisibles para navegar */}
               <div className="absolute inset-0 z-10 flex">
                 <div 
                   className="w-1/3 h-full cursor-pointer" 
@@ -329,7 +315,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
                 />
               </div>
 
-              {/* Imagen actual de la historia */}
               <div className="flex-1 bg-black flex items-center justify-center">
                  <img 
                    src={activeStoryGroup.stories[currentStoryIndex].media_url} 
@@ -342,7 +327,6 @@ export function StoriesBar({ currentUserId }: StoriesBarProps) {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG DE CONFIRMACIÓN DE BORRADO */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

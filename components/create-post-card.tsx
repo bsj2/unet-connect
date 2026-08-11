@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react'
 import { Image as ImageIcon, FileText, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { containsInappropriateContent } from '@/lib/moderation' // <-- Importamos el filtro
+import { toast } from './ui/toast'
 
 interface CreatePostCardProps {
   onPostCreated: () => void
@@ -13,23 +15,26 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
   const [text, setText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Estados para los archivos
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   
-  // Referencias para los inputs ocultos
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handlePost = async () => {
     if (!text.trim() && !selectedImage && !selectedFile) return
 
+    if (text.trim() && containsInappropriateContent(text)) {
+      toast.add({ title: "Inappropriate Content", description: "Your post contains inappropriate content. Please revise it.", type: "warning" })
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.user) {
-        alert("Debes iniciar sesión para publicar.")
+        toast.add({ title: "Not Logged In", description: "You must be logged in to create a post.", type: "error" })
         setIsSubmitting(false)
         return
       }
@@ -37,7 +42,6 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
       let image_url = null
       let file_url = null
 
-      // 1. Subir Imagen si existe
       if (selectedImage) {
         const fileExt = selectedImage.name.split('.').pop()
         const fileName = `${Math.random()}.${fileExt}`
@@ -53,7 +57,6 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
         image_url = data.publicUrl
       }
 
-      // 2. Subir Archivo PDF/Doc si existe
       if (selectedFile) {
         const fileExt = selectedFile.name.split('.').pop()
         const fileName = `${Math.random()}.${fileExt}`
@@ -69,7 +72,6 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
         file_url = data.publicUrl
       }
 
-      // 3. Insertar el Post en la base de datos
       const { error } = await supabase.from('posts').insert({
         user_id: session.user.id,
         content: text.trim(),
@@ -77,19 +79,18 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
         image_url: image_url,
         file_url: file_url,
         file_name: selectedFile ? selectedFile.name : null,
-        group_id: groupId || null // <- Le pasamos el ID del grupo aquí
+        group_id: groupId || null 
       })
 
       if (error) throw error
 
-      // Limpiar todo al terminar
       setText('')
       setSelectedImage(null)
       setSelectedFile(null)
       onPostCreated()
       
     } catch (error: any) {
-      alert("Error al publicar: " + error.message)
+      toast.add({ title: "Error", description: "Error publishing post: " + error.message, type: "error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -112,7 +113,6 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
             disabled={isSubmitting}
           />
 
-          {/* Vistas previas de los archivos seleccionados */}
           {(selectedImage || selectedFile) && (
             <div className="mt-3 flex flex-wrap gap-2">
               {selectedImage && (
@@ -134,7 +134,6 @@ export function CreatePostCard({ onPostCreated, groupId }: CreatePostCardProps) 
 
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2">
-              {/* Inputs ocultos */}
               <input 
                 type="file" 
                 accept="image/*" 

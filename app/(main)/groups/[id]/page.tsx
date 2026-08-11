@@ -15,6 +15,17 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from '@/components/ui/toast'
 
 export default function GroupPage() {
   const params = useParams()
@@ -29,7 +40,6 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Estados de Configuración
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -39,13 +49,16 @@ export default function GroupPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false)
+  const [showDeleteGroupDialog, setShowDeleteGroupDialog] = useState(false)
+  const [postToDelete, setPostToDelete] = useState<string | null>(null) 
+
   const fetchGroupData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const myId = session?.user?.id
       if (myId) setCurrentUserId(myId)
 
-      // 1. Traer datos del grupo
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('*')
@@ -56,14 +69,12 @@ export default function GroupPage() {
       setGroup(groupData)
       setEditDescription(groupData.description || '')
 
-      // 2. Traer cantidad de miembros
       const { count } = await supabase
         .from('group_members')
         .select('*', { count: 'exact', head: true })
         .eq('group_id', groupId)
       setMemberCount(count || 0)
 
-      // 3. Verificar si soy miembro
       if (myId) {
         const { data: memberData } = await supabase
           .from('group_members')
@@ -75,13 +86,12 @@ export default function GroupPage() {
         setIsMember(!!memberData)
       }
 
-      // 4. Traer SOLO los posts de este grupo
       const { data: postsData } = await supabase
         .from('posts')
         .select(`
           *,
           users (nombre, apellido, rol, email, avatar_url),
-          comments (id, content, created_at, user_id, users(nombre, apellido)),
+          comments (id, content, created_at, user_id, parent_id, users(nombre, apellido)),
           reactions (id, user_id)
         `)
         .eq('group_id', groupId)
@@ -100,7 +110,6 @@ export default function GroupPage() {
     if (groupId) fetchGroupData()
   }, [groupId])
 
-  // --- ACCIONES DEL GRUPO ---
   const handleJoinGroup = async () => {
     if (!currentUserId) return
     setActionLoading(true)
@@ -113,31 +122,61 @@ export default function GroupPage() {
       if (error) throw error
       setIsMember(true)
       setMemberCount(prev => prev + 1)
-    } catch (error: any) { alert("Error joining group: " + error.message) } finally { setActionLoading(false) }
+    } catch (error: any) { 
+      // toast.add({ title: "Error", description: "Error joining group: " + error.message, type: "error" }) 
+      // Nota: Asumo que usas un componente toast estándar, si tu API es diferente ajústalo
+      alert("Error joining group: " + error.message)
+    } finally { setActionLoading(false) }
   }
 
-  const handleLeaveGroup = async () => {
+  // Lógica separada: Ahora solo confirma en la BD tras darle OK al modal
+  const confirmLeaveGroup = async () => {
     if (!currentUserId) return
-    const confirm = window.confirm("Are you sure you want to leave this group?")
-    if (!confirm) return
-    
     setActionLoading(true)
     try {
       const { error } = await supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUserId)
       if (error) throw error
       setIsMember(false)
       setMemberCount(prev => Math.max(0, prev - 1))
-    } catch (error: any) { alert("Error leaving group: " + error.message) } finally { setActionLoading(false) }
+    } catch (error: any) { 
+      // toast.add({ title: "Error", description: "Error leaving group: " + error.message, type: "error" }) 
+      alert("Error leaving group: " + error.message)
+    } finally { 
+      setActionLoading(false)
+      setShowLeaveDialog(false)
+    }
   }
 
-  const handleDeletePost = async (postId: string) => {
+  // Lógica separada para Posts
+  const confirmDeletePost = async () => {
+    if (!postToDelete) return
     try {
-      await supabase.from('posts').delete().eq('id', postId)
-      setPosts(posts.filter(p => p.id !== postId))
-    } catch (error) { console.error(error) }
+      await supabase.from('posts').delete().eq('id', postToDelete)
+      setPosts(posts.filter(p => p.id !== postToDelete))
+    } catch (error: any) { 
+      // toast.add({ title: "Error", description: "Error deleting post: " + error.message, type: "error" }) 
+      alert("Error deleting post: " + error.message)
+    } finally {
+      setPostToDelete(null)
+    }
   }
 
-  // --- CONFIGURACIÓN DEL GRUPO ---
+  // Lógica separada para Grupo
+  const confirmDeleteGroup = async () => {
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase.from('groups').delete().eq('id', groupId)
+      if (error) throw error
+      router.push('/groups')
+    } catch (error: any) {
+      // toast.add({ title: "Error", description: "Error deleting group: " + error.message, type: "error" })
+      alert("Error deleting group: " + error.message)
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteGroupDialog(false)
+    }
+  }
+
   const handleSaveSettings = async () => {
     if (!currentUserId) return
     setIsSaving(true)
@@ -178,36 +217,21 @@ export default function GroupPage() {
       setBannerFile(null)
       setIsSettingsOpen(false)
     } catch (error: any) {
-      alert("Error al actualizar el grupo: " + error.message)
+      // toast.add({ title: "Error", description: "Error updating group: " + error.message, type: "error" })
+      alert("Error updating group: " + error.message)
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDeleteGroup = async () => {
-    const confirm = window.confirm("ATENCIÓN: ¿Estás seguro de que quieres eliminar este grupo de forma permanente? Se perderán todas las publicaciones.")
-    if (!confirm) return
-
-    setIsDeleting(true)
-    try {
-      const { error } = await supabase.from('groups').delete().eq('id', groupId)
-      if (error) throw error
-      router.push('/groups') // Redirigir al directorio de grupos
-    } catch (error: any) {
-      alert("Error al eliminar el grupo: " + error.message)
-      setIsDeleting(false)
-    }
-  }
-
-  if (loading) return <div className="text-center py-20 text-muted-foreground">Cargando grupo...</div>
-  if (!group) return <div className="text-center py-20 text-red-500">Grupo no encontrado</div>
+  if (loading) return <div className="text-center py-20 text-muted-foreground">Loading Group...</div>
+  if (!group) return <div className="text-center py-20 text-red-500">Group not found</div>
 
   const isCreator = currentUserId === group.creator_id
 
   return (
     <div className="min-h-screen bg-background pb-10">
       
-      {/* Banner del Grupo */}
       <div className="h-48 md:h-64 w-full bg-muted relative border-b border-border">
         {group.banner_url ? (
           <img src={group.banner_url} alt="Cover" className="w-full h-full object-cover" />
@@ -217,7 +241,6 @@ export default function GroupPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Cabecera y Botones */}
         <div className="relative flex justify-between items-end -mt-8 md:-mt-12 mb-6">
           <div className="w-16 h-16 md:w-24 md:h-24 rounded-xl border-4 border-background bg-card flex items-center justify-center overflow-hidden z-10 shadow-md">
              {group.avatar_url ? (
@@ -228,7 +251,6 @@ export default function GroupPage() {
           </div>
 
           <div className="mb-2 md:mb-4 flex items-center gap-2">
-            {/* Botón Settings SOLO para el creador */}
             {isCreator && (
               <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 <DialogTrigger className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border">
@@ -259,10 +281,9 @@ export default function GroupPage() {
                       <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="What is this group about?" className="w-full bg-muted/50 border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none" rows={4} />
                     </div>
                     
-                    {/* ZONA DE PELIGRO */}
                     <div className="pt-4 border-t border-border mt-4">
                       <button 
-                        onClick={handleDeleteGroup}
+                        onClick={() => { setIsSettingsOpen(false); setShowDeleteGroupDialog(true); }}
                         disabled={isDeleting}
                         className="w-full flex items-center justify-center gap-2 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors"
                       >
@@ -281,7 +302,6 @@ export default function GroupPage() {
               </Dialog>
             )}
 
-            {/* Botones de Unirse/Salir (El creador NO puede salir, o si puede, el botón está disponible) */}
             {!isCreator && (
               !isMember ? (
                 <button onClick={handleJoinGroup} disabled={actionLoading} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 min-w-[120px] justify-center">
@@ -289,7 +309,7 @@ export default function GroupPage() {
                   <span>Join Group</span>
                 </button>
               ) : (
-                <button onClick={handleLeaveGroup} disabled={actionLoading} className="flex items-center justify-center gap-2 bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border disabled:opacity-50 group min-w-[120px]">
+                <button onClick={() => setShowLeaveDialog(true)} disabled={actionLoading} className="flex items-center justify-center gap-2 bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border disabled:opacity-50 group min-w-[120px]">
                   <Users size={18} className="group-hover:hidden" />
                   <LogOut size={18} className="hidden group-hover:block" />
                   <span className="hidden sm:block sm:group-hover:hidden">Joined</span>
@@ -300,7 +320,6 @@ export default function GroupPage() {
           </div>
         </div>
 
-        {/* Información y Muro */}
         <div className="mb-8">
           <Link href="/groups" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4">
             <ArrowLeft size={16} /> Back to groups
@@ -309,11 +328,11 @@ export default function GroupPage() {
             {group.name}
           </h1>
           <p className="text-muted-foreground mb-4">
-            {group.description || "Sin descripción."}
+            {group.description || "No description available."}
           </p>
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/50 w-fit px-3 py-1.5 rounded-full">
             <Users size={16} />
-            <span>{memberCount} miembros</span>
+            <span>{memberCount} members</span>
           </div>
         </div>
 
@@ -324,7 +343,7 @@ export default function GroupPage() {
             <div className="bg-card border border-border rounded-lg p-5">
               <h3 className="font-semibold text-foreground mb-3">About this Group</h3>
               <p className="text-sm text-muted-foreground">
-                Espacio de discusión privado. Solo los miembros pueden publicar aquí.
+                Space of discussion for {group.name}. Here, members can share posts, ask questions, and collaborate on topics related to this group.
               </p>
             </div>
           </div>
@@ -340,7 +359,7 @@ export default function GroupPage() {
             
             {posts.length === 0 ? (
               <div className="text-center p-8 bg-muted/20 border border-border rounded-lg text-muted-foreground text-sm">
-                No hay publicaciones en este grupo todavía.
+                No posts in this group yet.
               </div>
             ) : (
               posts.map(post => (
@@ -348,13 +367,71 @@ export default function GroupPage() {
                   key={post.id}
                   post={post}
                   currentUserId={currentUserId}
-                  onDelete={handleDeletePost}
+                  // CAMBIO: Al hacer clic ahora guardamos el ID para el modal
+                  onDelete={() => setPostToDelete(post.id)} 
                 />
               ))
             )}
           </div>
         </div>
       </div>
+
+
+      {/* 1. modal to leave the group */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave this group? You will no longer be able to participate in discussions unless you join again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeaveGroup} className="bg-red-500 hover:bg-red-600 text-white">
+              Leave Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 2. modal to delete the group */}
+      <AlertDialog open={showDeleteGroupDialog} onOpenChange={setShowDeleteGroupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              WARNING: This action will permanently delete the group and all its posts. This cannot be undone. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteGroup} className="bg-red-500 hover:bg-red-600 text-white">
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 3. modal to delete a post within the group */}
+      <AlertDialog open={!!postToDelete} onOpenChange={() => setPostToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Post</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePost} className="bg-red-500 hover:bg-red-600 text-white">
+              Delete Post
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   )
 }

@@ -21,20 +21,17 @@ export default function StandalonePostPage() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) setCurrentUserId(session.user.id)
 
-        // 1. Saber de quién es el post
         const { data: mainPost } = await supabase.from('posts').select('user_id').eq('id', postId).single()
         if (!mainPost) throw new Error("Post not found")
 
-        // 2. Traer todos los posts visuales de ese usuario
         const { data: allPosts } = await supabase
           .from('posts')
-          .select(`*, users (nombre, apellido, avatar_url), comments (id, content, created_at, user_id, users(nombre, apellido, avatar_url)), reactions (id, user_id, reaction_type)`)
+          .select(`*, users (nombre, apellido, avatar_url), comments (id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url)), reactions (id, user_id, reaction_type)`)
           .eq('user_id', mainPost.user_id)
           .or('media_urls.neq.{},image_url.not.is.null')
           .order('created_at', { ascending: false })
 
         if (allPosts) {
-          // Ponemos el post clickeado de primero para que sea lo primero que vea
           const clickedPost = allPosts.find(p => p.id === postId)
           const otherPosts = allPosts.filter(p => p.id !== postId)
           if (clickedPost) setPosts([clickedPost, ...otherPosts])

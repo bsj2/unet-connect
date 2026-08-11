@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ProfileGrid } from '@/components/profile-grid'
-import { PostCard } from '@/components/post-card' // Asegúrate de ajustar la ruta si difiere
+import { PostCard } from '@/components/post-card'
 import Link from 'next/link'
+import { toast } from '@/components/ui/toast'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -25,7 +26,6 @@ export default function ProfilePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Estados de Edición
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editBio, setEditBio] = useState('')
@@ -34,7 +34,6 @@ export default function ProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
-  // Estados de Amistad y Seguidores
   const [connectionStatus, setConnectionStatus] = useState<'NONE' | 'PENDING_SENT' | 'PENDING_RECEIVED' | 'ACCEPTED'>('NONE')
   const [connectionId, setConnectionId] = useState<string | null>(null)
   const [friendsCount, setFriendsCount] = useState(0)
@@ -43,7 +42,6 @@ export default function ProfilePage() {
   const [followersCount, setFollowersCount] = useState(0)
   const [isConnectionLoading, setIsConnectionLoading] = useState(false)
   
-  // Estados para las distintas publicaciones
   const [communityPosts, setCommunityPosts] = useState<any[]>([])
   const [clips, setClips] = useState<any[]>([])
   const [tradeProducts, setTradeProducts] = useState<any[]>([])
@@ -54,24 +52,21 @@ export default function ProfilePage() {
       const myId = session?.user?.id
       if (myId) setCurrentUserId(myId)
 
-      // 1. Traer datos del perfil
       const { data: profileData } = await supabase.from('users').select('*').eq('id', profileId).single()
       setProfile(profileData)
       if (profileData) setEditBio(profileData.biografia || '')
 
-      // 2. Traer conteos de amigos y seguidores
       const { count: fCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FRIEND').eq('status', 'ACCEPTED').or(`sender_id.eq.${profileId},receiver_id.eq.${profileId}`)
       setFriendsCount(fCount || 0)
       const { count: folCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FOLLOW').eq('status', 'ACCEPTED').eq('receiver_id', profileId)
       setFollowersCount(folCount || 0)
 
-      // 3. Traer publicaciones de Comunidad (Posts de texto/discusión)
       const { data: postsData } = await supabase
         .from('posts')
         .select(`
           *,
           users (nombre, apellido, avatar_url),
-          comments (id, content, created_at, user_id, users(nombre, apellido, avatar_url)),
+          comments (id, content, created_at, user_id, parent_id, users(nombre, apellido, avatar_url)),
           reactions (id, user_id, reaction_type)
         `)
         .eq('user_id', profileId)
@@ -79,7 +74,6 @@ export default function ProfilePage() {
 
       setCommunityPosts(postsData || [])
 
-      // 4. Traer Clips del usuario
       const { data: clipsData } = await supabase
         .from('clips')
         .select('id, video_url, likes_count, clip_likes(user_id)')
@@ -88,7 +82,6 @@ export default function ProfilePage() {
       
       setClips(clipsData || [])
 
-      // 5. Traer artículos/servicios de UNET-Trade
       const { data: tradeData } = await supabase
         .from('products')
         .select('*, seller:users(id, nombre, apellido, avatar_url)')
@@ -97,7 +90,6 @@ export default function ProfilePage() {
 
       setTradeProducts(tradeData || [])
 
-      // Check de estado de relaciones
       if (myId && myId !== profileId) {
         const { data: friendData } = await supabase.from('connections').select('*').eq('type', 'FRIEND').or(`and(sender_id.eq.${myId},receiver_id.eq.${profileId}),and(sender_id.eq.${profileId},receiver_id.eq.${myId})`).maybeSingle()
         if (friendData) {
@@ -181,11 +173,11 @@ export default function ProfilePage() {
       await supabase.from('users').update({ biografia: editBio.trim(), avatar_url: updatedAvatarUrl, banner_url: updatedBannerUrl }).eq('id', currentUserId)
       setProfile({ ...profile, biografia: editBio.trim(), avatar_url: updatedAvatarUrl, banner_url: updatedBannerUrl })
       setAvatarFile(null); setBannerFile(null); setIsEditOpen(false)
-    } catch (error: any) { alert(error.message) } finally { setIsSaving(false) }
+    } catch (error: any) { toast.add({ title: "Error", description: "Error updating profile: " + error.message, type: "error" }) } finally { setIsSaving(false) }
   }
 
-  if (loading) return <div className="text-center py-20 text-muted-foreground">Cargando perfil...</div>
-  if (!profile) return <div className="text-center py-20 text-red-500">Perfil no encontrado</div>
+  if (loading) return <div className="text-center py-20 text-muted-foreground">Loading profile...</div>
+  if (!profile) return <div className="text-center py-20 text-red-500">Profile not found</div>
 
   const isMyProfile = currentUserId === profile.id
   const initials = `${profile.nombre?.charAt(0) || ''}${profile.apellido?.charAt(0) || ''}`
@@ -276,10 +268,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Bloque Superior: Info y Bio juntas */}
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">{profile.nombre} {profile.apellido}</h1>
-          <p className="text-muted-foreground font-medium mb-4">{profile.rol} en la UNET</p>
+          <p className="text-muted-foreground font-medium mb-4">{profile.rol} at the UNET</p>
           
           <div className="flex flex-col md:flex-row gap-6 mb-6">
             <div className="flex items-center gap-6 text-sm flex-shrink-0">
@@ -295,11 +286,10 @@ export default function ProfilePage() {
             
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground items-center">
               {profile.carrera && <div className="flex items-center gap-1.5 bg-muted px-3 py-1 rounded-full"><BookOpen size={14} /><span>{profile.carrera}</span></div>}
-              {profile.semestre && <div className="flex items-center gap-1.5 bg-muted px-3 py-1 rounded-full"><GraduationCap size={14} /><span>Semestre {profile.semestre}</span></div>}
+              {profile.semestre && <div className="flex items-center gap-1.5 bg-muted px-3 py-1 rounded-full"><GraduationCap size={14} /><span>Semester {profile.semestre}</span></div>}
             </div>
           </div>
 
-          {/* Biografía Integrada */}
           <div className="bg-muted/30 border border-border rounded-lg p-4 max-w-2xl">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-2">
               <Info size={16} className="text-primary"/> About
@@ -312,7 +302,6 @@ export default function ProfilePage() {
 
         <div className="h-px w-full bg-border mb-8" />
 
-        {/* Bloque Inferior: Pestanias para todos los tipos de publicaciones */}
         <div className="w-full">
           <Tabs defaultValue="grid" className="w-full mt-4">
             <TabsList className="w-full grid grid-cols-4 bg-transparent border-b border-border rounded-none h-12 p-0 mb-6">
@@ -347,7 +336,7 @@ export default function ProfilePage() {
               <ProfileGrid userId={params.id as string} />
             </TabsContent>
 
-            {/* 2. TAB POSTS (Community / Feed de Texto) */}
+            {/* 2. TAB POSTS (Community) */}
             <TabsContent value="posts" className="mt-0 outline-none space-y-4 max-w-2xl mx-auto">
               {communityPosts.length === 0 ? (
                 <div className="text-center py-20 text-muted-foreground">

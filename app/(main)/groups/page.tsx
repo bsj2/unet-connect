@@ -12,13 +12,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { toast } from '@/components/ui/toast'
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  // Estados para crear un grupo
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -29,7 +29,6 @@ export default function GroupsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) setCurrentUserId(session.user.id)
 
-      // Traemos los grupos y contamos cuántos miembros tienen
       const { data, error } = await supabase
         .from('groups')
         .select(`
@@ -56,7 +55,7 @@ export default function GroupsPage() {
     setIsCreating(true)
 
     try {
-      // 1. Crear el grupo
+      // 1. create the group in the groups table
       const { data: newGroup, error: groupError } = await supabase
         .from('groups')
         .insert({
@@ -69,7 +68,7 @@ export default function GroupsPage() {
 
       if (groupError) throw groupError
 
-      // 2. Añadir al creador como ADMIN en group_members
+      // 2. add the current user as an ADMIN in the group_members table
       const { error: memberError } = await supabase
         .from('group_members')
         .insert({
@@ -80,14 +79,18 @@ export default function GroupsPage() {
 
       if (memberError) throw memberError
 
-      // Limpiar y recargar
+      // clean up and refresh
       setNewGroupName('')
       setNewGroupDesc('')
       setIsCreateOpen(false)
       fetchGroups()
       
     } catch (error: any) {
-      alert("Error creating group: " + error.message)
+      toast.add({
+        title: "Error",
+        description: "Error creating group: " + error.message,
+        type: "error",
+      })
     } finally {
       setIsCreating(false)
     }
@@ -97,7 +100,7 @@ export default function GroupsPage() {
     <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* Encabezado y Botón Crear */}
+        {/* heading and create button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
@@ -152,7 +155,7 @@ export default function GroupsPage() {
           </Dialog>
         </div>
 
-        {/* Lista de Grupos */}
+        {/* group list */}
         {loading ? (
           <div className="text-center py-20 text-muted-foreground">Cargando grupos...</div>
         ) : groups.length === 0 ? (
