@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { UserPlus, UserCheck, Clock, UserMinus, Check, X as XIcon, BookOpen, GraduationCap, Camera, Loader2, Image as ImageIcon, Users, UserPlus2, Info } from 'lucide-react'
+import { UserPlus, UserCheck, Clock, UserMinus, Check, X as XIcon, BookOpen, GraduationCap, Camera, Loader2, Image as ImageIcon, Users, UserPlus2, Info, Play, MessageSquare, Store, Tag } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,10 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ProfileGrid } from '@/components/profile-grid'
+import { PostCard } from '@/components/post-card' // Asegúrate de ajustar la ruta si difiere
+import Link from 'next/link'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -39,39 +42,82 @@ export default function ProfilePage() {
   const [followId, setFollowId] = useState<string | null>(null)
   const [followersCount, setFollowersCount] = useState(0)
   const [isConnectionLoading, setIsConnectionLoading] = useState(false)
+  
+  // Estados para las distintas publicaciones
+  const [communityPosts, setCommunityPosts] = useState<any[]>([])
+  const [clips, setClips] = useState<any[]>([])
+  const [tradeProducts, setTradeProducts] = useState<any[]>([])
+
+  const fetchProfileData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const myId = session?.user?.id
+      if (myId) setCurrentUserId(myId)
+
+      // 1. Traer datos del perfil
+      const { data: profileData } = await supabase.from('users').select('*').eq('id', profileId).single()
+      setProfile(profileData)
+      if (profileData) setEditBio(profileData.biografia || '')
+
+      // 2. Traer conteos de amigos y seguidores
+      const { count: fCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FRIEND').eq('status', 'ACCEPTED').or(`sender_id.eq.${profileId},receiver_id.eq.${profileId}`)
+      setFriendsCount(fCount || 0)
+      const { count: folCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FOLLOW').eq('status', 'ACCEPTED').eq('receiver_id', profileId)
+      setFollowersCount(folCount || 0)
+
+      // 3. Traer publicaciones de Comunidad (Posts de texto/discusión)
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          users (nombre, apellido, avatar_url),
+          comments (id, content, created_at, user_id, users(nombre, apellido, avatar_url)),
+          reactions (id, user_id, reaction_type)
+        `)
+        .eq('user_id', profileId)
+        .order('created_at', { ascending: false })
+
+      setCommunityPosts(postsData || [])
+
+      // 4. Traer Clips del usuario
+      const { data: clipsData } = await supabase
+        .from('clips')
+        .select('id, video_url, likes_count, clip_likes(user_id)')
+        .eq('user_id', profileId)
+        .order('created_at', { ascending: false })
+      
+      setClips(clipsData || [])
+
+      // 5. Traer artículos/servicios de UNET-Trade
+      const { data: tradeData } = await supabase
+        .from('products')
+        .select('*, seller:users(id, nombre, apellido, avatar_url)')
+        .eq('seller_id', profileId)
+        .order('created_at', { ascending: false })
+
+      setTradeProducts(tradeData || [])
+
+      // Check de estado de relaciones
+      if (myId && myId !== profileId) {
+        const { data: friendData } = await supabase.from('connections').select('*').eq('type', 'FRIEND').or(`and(sender_id.eq.${myId},receiver_id.eq.${profileId}),and(sender_id.eq.${profileId},receiver_id.eq.${myId})`).maybeSingle()
+        if (friendData) {
+          setConnectionId(friendData.id)
+          if (friendData.status === 'ACCEPTED') setConnectionStatus('ACCEPTED')
+          else if (friendData.status === 'PENDING') setConnectionStatus(friendData.sender_id === myId ? 'PENDING_SENT' : 'PENDING_RECEIVED')
+        }
+        const { data: followData } = await supabase.from('connections').select('*').eq('type', 'FOLLOW').eq('sender_id', myId).eq('receiver_id', profileId).maybeSingle()
+        if (followData) { setIsFollowing(true); setFollowId(followData.id) }
+      }
+    } catch (error) { console.error(error) } finally { setLoading(false) }
+  }
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const myId = session?.user?.id
-        if (myId) setCurrentUserId(myId)
-
-        // Traer perfil
-        const { data: profileData } = await supabase.from('users').select('*').eq('id', profileId).single()
-        setProfile(profileData)
-        if (profileData) setEditBio(profileData.biografia || '')
-
-        // Traer conteos
-        const { count: fCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FRIEND').eq('status', 'ACCEPTED').or(`sender_id.eq.${profileId},receiver_id.eq.${profileId}`)
-        setFriendsCount(fCount || 0)
-        const { count: folCount } = await supabase.from('connections').select('*', { count: 'exact', head: true }).eq('type', 'FOLLOW').eq('status', 'ACCEPTED').eq('receiver_id', profileId)
-        setFollowersCount(folCount || 0)
-
-        if (myId && myId !== profileId) {
-          const { data: friendData } = await supabase.from('connections').select('*').eq('type', 'FRIEND').or(`and(sender_id.eq.${myId},receiver_id.eq.${profileId}),and(sender_id.eq.${profileId},receiver_id.eq.${myId})`).maybeSingle()
-          if (friendData) {
-            setConnectionId(friendData.id)
-            if (friendData.status === 'ACCEPTED') setConnectionStatus('ACCEPTED')
-            else if (friendData.status === 'PENDING') setConnectionStatus(friendData.sender_id === myId ? 'PENDING_SENT' : 'PENDING_RECEIVED')
-          }
-          const { data: followData } = await supabase.from('connections').select('*').eq('type', 'FOLLOW').eq('sender_id', myId).eq('receiver_id', profileId).maybeSingle()
-          if (followData) { setIsFollowing(true); setFollowId(followData.id) }
-        }
-      } catch (error) { console.error(error) } finally { setLoading(false) }
-    }
     if (profileId) fetchProfileData()
   }, [profileId])
+
+  const handleDeletePost = (postId: string) => {
+    setCommunityPosts(prev => prev.filter(p => p.id !== postId))
+  }
 
   const toggleFollow = async () => {
     if (!currentUserId) return
@@ -198,7 +244,7 @@ export default function ProfilePage() {
               </>
             ) : (
               <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogTrigger className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border">
+                <DialogTrigger className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border outline-none">
                   Edit Profile
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
@@ -266,10 +312,123 @@ export default function ProfilePage() {
 
         <div className="h-px w-full bg-border mb-8" />
 
-        {/* Bloque Inferior: Grid Completo */}
+        {/* Bloque Inferior: Pestanias para todos los tipos de publicaciones */}
         <div className="w-full">
-          <h3 className="font-bold text-lg text-foreground mb-4">Publicaciones Visuales</h3>
-          <ProfileGrid userId={params.id as string} />
+          <Tabs defaultValue="grid" className="w-full mt-4">
+            <TabsList className="w-full grid grid-cols-4 bg-transparent border-b border-border rounded-none h-12 p-0 mb-6">
+              <TabsTrigger 
+                value="grid" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground rounded-none shadow-none h-full text-xs sm:text-sm font-semibold transition-none"
+              >
+                Grid
+              </TabsTrigger>
+              <TabsTrigger 
+                value="posts" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground rounded-none shadow-none h-full text-xs sm:text-sm font-semibold transition-none"
+              >
+                Posts
+              </TabsTrigger>
+              <TabsTrigger 
+                value="clips" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground rounded-none shadow-none h-full text-xs sm:text-sm font-semibold transition-none"
+              >
+                Clips
+              </TabsTrigger>
+              <TabsTrigger 
+                value="trade" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground rounded-none shadow-none h-full text-xs sm:text-sm font-semibold transition-none"
+              >
+                Trade
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* 1. TAB GRID (Visual Feed) */}
+            <TabsContent value="grid" className="mt-0 outline-none">
+              <ProfileGrid userId={params.id as string} />
+            </TabsContent>
+
+            {/* 2. TAB POSTS (Community / Feed de Texto) */}
+            <TabsContent value="posts" className="mt-0 outline-none space-y-4 max-w-2xl mx-auto">
+              {communityPosts.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  No community posts yet.
+                </div>
+              ) : (
+                communityPosts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUserId}
+                    onDelete={handleDeletePost}
+                  />
+                ))
+              )}
+            </TabsContent>
+            
+            {/* 3. TAB CLIPS */}
+            <TabsContent value="clips" className="mt-0 outline-none">
+              {clips.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground">
+                  <Play className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  No clips uploaded yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 md:gap-4">
+                  {clips.map((clip) => (
+                    <Link 
+                      key={clip.id} 
+                      href={`/clips?id=${clip.id}`} 
+                      className="relative aspect-[9/16] bg-muted cursor-pointer group overflow-hidden rounded-sm md:rounded-lg block"
+                    >
+                      <video src={clip.video_url} className="w-full h-full object-cover" preload="metadata" />
+                      
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <Play size={24} className="fill-white" />
+                          <span>{clip.clip_likes?.length || clip.likes_count || 0}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* 4. TAB TRADE (Marketplace Items) */}
+            <TabsContent value="trade" className="mt-0 outline-none">
+              {tradeProducts.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground">
+                  <Store className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  No items listed on UNET-Trade yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {tradeProducts.map((product) => (
+                    <Link
+                      key={product.id}
+                      href={`/trade`}
+                      className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col group"
+                    >
+                      <div className="relative aspect-square bg-muted overflow-hidden">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <Tag className="opacity-20" size={36} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 flex flex-col flex-1">
+                        <h4 className="font-semibold text-foreground text-sm line-clamp-1 mb-1">{product.title}</h4>
+                        <span className="font-bold text-primary text-base">${product.price}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
       </div>

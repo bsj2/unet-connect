@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import Link from 'next/link'
 
 interface ProfileGridProps {
   userId: string
@@ -69,30 +70,24 @@ export function ProfileGrid({ userId }: ProfileGridProps) {
       {/* Cuadrícula de 3 columnas */}
       <div className="grid grid-cols-3 gap-1 md:gap-4">
         {posts.map((post) => (
-          <div 
+          <Link 
             key={post.id} 
-            className="relative aspect-square cursor-pointer group bg-muted overflow-hidden rounded-sm md:rounded-lg"
-            onClick={() => setSelectedPost(post)}
+            href={`/p/${post.id}`}
+            scroll={false} 
+            className="relative aspect-square cursor-pointer group bg-muted overflow-hidden rounded-sm md:rounded-lg block"
           >
             <img 
-              src={post.image_url} 
+              src={post.media_urls?.[0] || post.image_url} 
               alt="Post" 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+              loading="lazy" 
             />
             
-            {/* Efecto Hover (Previsualización) */}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-4 text-white">
-              <div className="flex items-center gap-1.5 font-bold">
-                <Heart size={18} className="fill-white" />
-                <span>{post.reactions?.length || 0}</span>
-              </div>
-              <div className="flex items-center gap-1.5 font-bold">
-                <MessageCircle size={18} className="fill-white" />
-                <span>{post.comments?.length || 0}</span>
-              </div>
+              <div className="flex items-center gap-1.5 font-bold"><Heart size={18} className="fill-white" /><span>{post.reactions?.length || 0}</span></div>
+              <div className="flex items-center gap-1.5 font-bold"><MessageCircle size={18} className="fill-white" /><span>{post.comments?.length || 0}</span></div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 

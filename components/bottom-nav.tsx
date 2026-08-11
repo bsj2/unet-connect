@@ -1,15 +1,15 @@
 'use client';
 
-import { Home, Grid3X3, Video, Users, Briefcase } from 'lucide-react';
+import { Home, Grid3X3, Video, Users, Briefcase, Library } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { label: 'Muro', href: '/', icon: Home },
-  { label: 'Grid', href: '/grid', icon: Grid3X3 },
-  { label: 'Feed', href: '/feed', icon: Video },
-  { label: 'Grupos', href: '/groups', icon: Users },
-  { label: 'Trade', href: '/trade', icon: Briefcase },
+  { label: 'Home', href: '/', icon: Home },
+  { label: 'Community', href: '/community', icon: Users },
+  { label: 'Clips', href: '/clips', icon: Video },
+  { label: 'Groups', href: '/groups', icon: Library },
+  { label: 'UNET-Trade', href: '/trade', icon: Briefcase },
 ];
 
 export function BottomNav() {

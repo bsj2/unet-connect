@@ -250,7 +250,7 @@ export function AuthForm() {
                 value={emailPrefix}
                 onChange={(e) => setEmailPrefix(e.target.value.toLowerCase().trim())}
                 className="w-full pl-9 pr-2 py-2 bg-transparent text-sm focus:outline-none" 
-                placeholder="tomas.contreras" 
+                placeholder="john.doe" 
               />
             </div>
             <div className="flex items-center px-3 bg-muted/50 border-l border-input text-muted-foreground text-sm font-medium select-none pointer-events-none">

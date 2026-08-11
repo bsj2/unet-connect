@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation';
 const navItems = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Community', href: '/community', icon: Users },
-  { label: 'TikTok Feed', href: '/feed', icon: Video },
-  { label: 'Grupos', href: '/groups', icon: Library },
+  { label: 'Clips', href: '/clips', icon: Video },
+  { label: 'Groups', href: '/groups', icon: Library },
   { label: 'UNET-Trade', href: '/trade', icon: Briefcase },
 ];
 
@@ -16,8 +16,8 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:fixed md:left-0 md:top-16 md:h-[calc(100vh-4rem)] md:w-64 md:flex md:flex-col md:border-r md:border-border md:bg-sidebar md:overflow-y-auto z-50">
-      <nav className="flex-1 px-4 py-6 space-y-2 z-50">
+    <aside className="hidden md:fixed md:left-0 md:top-16 md:h-[calc(100vh-4rem)] md:w-64 md:flex md:flex-col md:border-r md:border-border md:bg-sidebar md:overflow-y-auto z-[30]">
+      <nav className="flex-1 px-4 py-6 space-y-2 z-[30]">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
