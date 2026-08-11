@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Heart, MessageCircle, Share2, Music, Loader2, Play, Plus, Upload, Video, Check, Send } from 'lucide-react'
 import Link from 'next/link'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useSearchParams } from 'next/navigation'
 
-export default function CampusClipsPage() {
+function ClipsContent() {
   const searchParams = useSearchParams()
   const sharedClipId = searchParams.get('id')
   
@@ -310,5 +310,17 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CampusClipsPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-[calc(100vh-4rem)] flex justify-center items-center bg-black">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    }>
+      <ClipsContent />
+    </Suspense>
   )
 }
