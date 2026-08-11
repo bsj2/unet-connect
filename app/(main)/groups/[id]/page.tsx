@@ -253,7 +253,7 @@ export default function GroupPage() {
           <div className="mb-2 md:mb-4 flex items-center gap-2">
             {isCreator && (
               <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-                <DialogTrigger className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border">
+                <DialogTrigger data-protected="true" className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border">
                   <Settings size={18} />
                   <span className="hidden sm:inline">Settings</span>
                 </DialogTrigger>
@@ -304,12 +304,12 @@ export default function GroupPage() {
 
             {!isCreator && (
               !isMember ? (
-                <button onClick={handleJoinGroup} disabled={actionLoading} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 min-w-[120px] justify-center">
+                <button data-protected="true" onClick={handleJoinGroup} disabled={actionLoading} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 min-w-[120px] justify-center">
                   <UserPlus size={18} />
                   <span>Join Group</span>
                 </button>
               ) : (
-                <button onClick={() => setShowLeaveDialog(true)} disabled={actionLoading} className="flex items-center justify-center gap-2 bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border disabled:opacity-50 group min-w-[120px]">
+                <button data-protected="true" onClick={() => setShowLeaveDialog(true)} disabled={actionLoading} className="flex items-center justify-center gap-2 bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors border border-border disabled:opacity-50 group min-w-[120px]">
                   <Users size={18} className="group-hover:hidden" />
                   <LogOut size={18} className="hidden group-hover:block" />
                   <span className="hidden sm:block sm:group-hover:hidden">Joined</span>

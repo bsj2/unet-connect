@@ -1,29 +1,51 @@
-'use client';
+"use client";
 
-import { Search, Bell, LogOut, Users, User as UserIcon, FileText, Check, Heart, UserPlus, MessageCircle, Video, Store, Loader2, ShieldAlert } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import {
+  Search,
+  Bell,
+  LogOut,
+  Users,
+  User as UserIcon,
+  FileText,
+  Check,
+  Heart,
+  UserPlus,
+  MessageCircle,
+  Video,
+  Store,
+  Loader2,
+  ShieldAlert,
+} from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
+import { toast } from "./ui/toast";
 
 export function Header() {
   const router = useRouter();
-  const [initials, setInitials] = useState<string>('');
+  const [initials, setInitials] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
+
   const [isAdmin, setIsAdmin] = useState(false);
-  
+
   const [loading, setLoading] = useState(true);
-  
-  const [searchQuery, setSearchQuery] = useState('');
+
+  const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState({ users: [] as any[], posts: [] as any[], groups: [] as any[], clips: [] as any[], trade: [] as any[] });
+  const [suggestions, setSuggestions] = useState({
+    users: [] as any[],
+    posts: [] as any[],
+    groups: [] as any[],
+    clips: [] as any[],
+    trade: [] as any[],
+  });
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLFormElement>(null);
 
@@ -31,27 +53,62 @@ export function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    if (isLoggedIn) return;
+
+    const interceptProtectedClicks = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const protectedElement = target.closest('[data-protected="true"]');
+
+      if (protectedElement) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        toast.add({
+          title: "Authentication Required",
+          description: "Please sign in to interact with the community.",
+          type: "warning",
+        });
+      }
+    };
+
+    document.addEventListener("click", interceptProtectedClicks, true);
+
+    return () => {
+      document.removeEventListener("click", interceptProtectedClicks, true);
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user) {
         setIsLoggedIn(true);
         setCurrentUserId(session.user.id);
-        const n = session.user.user_metadata?.nombre || '';
-        const a = session.user.user_metadata?.apellido || '';
+        const n = session.user.user_metadata?.nombre || "";
+        const a = session.user.user_metadata?.apellido || "";
         setInitials(`${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`);
-        
-        const { data: userData } = await supabase.from('users').select('rol').eq('id', session.user.id).single();
-        if (userData?.rol === 'Professor' || userData?.rol === 'Staff') {
+
+        const { data: userData } = await supabase
+          .from("users")
+          .select("rol")
+          .eq("id", session.user.id)
+          .single();
+        if (userData?.rol === "Professor" || userData?.rol === "Staff") {
           setIsAdmin(true);
         }
 
@@ -65,82 +122,151 @@ export function Header() {
     };
     checkUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setIsLoggedIn(true);
-        setCurrentUserId(session.user.id);
-        const n = session.user.user_metadata?.nombre || '';
-        const a = session.user.user_metadata?.apellido || '';
-        setInitials(`${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`);
-        
-        supabase.from('users').select('rol').eq('id', session.user.id).single().then(({ data }) => {
-          if (data?.rol === 'Professor' || data?.rol === 'Staff') setIsAdmin(true);
-        });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          setIsLoggedIn(true);
+          setCurrentUserId(session.user.id);
+          const n = session.user.user_metadata?.nombre || "";
+          const a = session.user.user_metadata?.apellido || "";
+          setInitials(
+            `${n.charAt(0).toUpperCase()}${a.charAt(0).toUpperCase()}`,
+          );
 
-        fetchNotifications(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setIsLoggedIn(false);
-        setInitials('');
-        setCurrentUserId(null);
-        setIsAdmin(false);
-        setNotifications([]);
-        setUnreadCount(0);
-      }
-    });
+          supabase
+            .from("users")
+            .select("rol")
+            .eq("id", session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data?.rol === "Professor" || data?.rol === "Staff")
+                setIsAdmin(true);
+            });
+
+          fetchNotifications(session.user.id);
+        } else if (event === "SIGNED_OUT") {
+          setIsLoggedIn(false);
+          setInitials("");
+          setCurrentUserId(null);
+          setIsAdmin(false);
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+      },
+    );
     return () => authListener.subscription.unsubscribe();
   }, []);
 
   const fetchNotifications = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from('notifications').select('id, type, is_read, created_at, post_id, sender:users!fk_notification_sender(id, nombre, apellido, avatar_url)').eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
+      const { data, error } = await supabase
+        .from("notifications")
+        .select(
+          "id, type, is_read, created_at, post_id, sender:users!fk_notification_sender(id, nombre, apellido, avatar_url)",
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20);
       if (error) throw error;
-      if (data) { setNotifications(data); setUnreadCount(data.filter(n => !n.is_read).length); }
-    } catch (error) { console.error("Error fetching notifications", error); }
+      if (data) {
+        setNotifications(data);
+        setUnreadCount(data.filter((n) => !n.is_read).length);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications", error);
+    }
   };
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId);
-      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) { console.error("Error marking read", error); }
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notificationId);
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, is_read: true } : n,
+        ),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Error marking read", error);
+    }
   };
 
   const markAllAsRead = async () => {
     if (!currentUserId) return;
     try {
-      await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUserId).eq('is_read', false);
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", currentUserId)
+        .eq("is_read", false);
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
-    } catch (error) { console.error(error) }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   // --- REAL TIME SEARCH (PREVIEW) ---
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (searchQuery.trim().length < 2) { 
-        setSuggestions({ users: [], posts: [], groups: [], clips: [], trade: [] }); 
-        setIsSearching(false); 
-        return; 
+      if (searchQuery.trim().length < 2) {
+        setSuggestions({
+          users: [],
+          posts: [],
+          groups: [],
+          clips: [],
+          trade: [],
+        });
+        setIsSearching(false);
+        return;
       }
       setIsSearching(true);
       const query = searchQuery.trim();
       try {
-        const [usersRes, postsRes, groupsRes, clipsRes, tradeRes] = await Promise.all([
-          supabase.from('users').select('id, nombre, apellido, avatar_url').or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`).limit(3),
-          supabase.from('posts').select('id, content').ilike('content', `%${query}%`).limit(3),
-          supabase.from('groups').select('id, name').ilike('name', `%${query}%`).limit(3),
-          supabase.from('clips').select('id, content').ilike('content', `%${query}%`).limit(3),
-          supabase.from('products').select('id, title, price').ilike('title', `%${query}%`).eq('status', 'AVAILABLE').limit(3)
-        ]);
-        setSuggestions({ 
-          users: usersRes.data || [], 
+        const [usersRes, postsRes, groupsRes, clipsRes, tradeRes] =
+          await Promise.all([
+            supabase
+              .from("users")
+              .select("id, nombre, apellido, avatar_url")
+              .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
+              .limit(3),
+            supabase
+              .from("posts")
+              .select("id, content")
+              .ilike("content", `%${query}%`)
+              .limit(3),
+            supabase
+              .from("groups")
+              .select("id, name")
+              .ilike("name", `%${query}%`)
+              .limit(3),
+            supabase
+              .from("clips")
+              .select("id, content")
+              .ilike("content", `%${query}%`)
+              .limit(3),
+            supabase
+              .from("products")
+              .select("id, title, price")
+              .ilike("title", `%${query}%`)
+              .eq("status", "AVAILABLE")
+              .limit(3),
+          ]);
+        setSuggestions({
+          users: usersRes.data || [],
           posts: postsRes.data || [],
           groups: groupsRes.data || [],
           clips: clipsRes.data || [],
-          trade: tradeRes.data || []
+          trade: tradeRes.data || [],
         });
-      } catch (error) { console.error(error); } finally { setIsSearching(false); }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsSearching(false);
+      }
     };
     const delayDebounceFn = setTimeout(() => fetchSuggestions(), 300);
     return () => clearTimeout(delayDebounceFn);
@@ -159,45 +285,121 @@ export function Header() {
   const renderNotificationContent = (notif: any) => {
     const senderName = `${notif.sender.nombre} ${notif.sender.apellido}`;
     switch (notif.type) {
-      case 'LIKE': return { icon: <Heart size={16} className="text-red-500" />, text: <span><strong>{senderName}</strong> liked your post.</span> };
-      case 'COMMENT': return { icon: <MessageCircle size={16} className="text-blue-500" />, text: <span><strong>{senderName}</strong> commented on your post.</span> };
-      case 'FRIEND_REQUEST': return { icon: <UserPlus size={16} className="text-green-500" />, text: <span><strong>{senderName}</strong> sent you a friend request.</span> };
-      case 'FOLLOW': return { icon: <Users size={16} className="text-primary" />, text: <span><strong>{senderName}</strong> started following you.</span> };
-      default: return { icon: <Bell size={16} />, text: <span>New notification from {senderName}</span> };
+      case "LIKE":
+        return {
+          icon: <Heart size={16} className="text-red-500" />,
+          text: (
+            <span>
+              <strong>{senderName}</strong> liked your post.
+            </span>
+          ),
+        };
+      case "COMMENT":
+        return {
+          icon: <MessageCircle size={16} className="text-blue-500" />,
+          text: (
+            <span>
+              <strong>{senderName}</strong> commented on your post.
+            </span>
+          ),
+        };
+      case "FRIEND_REQUEST":
+        return {
+          icon: <UserPlus size={16} className="text-green-500" />,
+          text: (
+            <span>
+              <strong>{senderName}</strong> sent you a friend request.
+            </span>
+          ),
+        };
+      case "FOLLOW":
+        return {
+          icon: <Users size={16} className="text-primary" />,
+          text: (
+            <span>
+              <strong>{senderName}</strong> started following you.
+            </span>
+          ),
+        };
+      default:
+        return {
+          icon: <Bell size={16} />,
+          text: <span>New notification from {senderName}</span>,
+        };
     }
   };
 
-  const hasSuggestions = suggestions.users.length > 0 || suggestions.posts.length > 0 || suggestions.groups.length > 0 || suggestions.clips.length > 0 || suggestions.trade.length > 0;
+  const hasSuggestions =
+    suggestions.users.length > 0 ||
+    suggestions.posts.length > 0 ||
+    suggestions.groups.length > 0 ||
+    suggestions.clips.length > 0 ||
+    suggestions.trade.length > 0;
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-[50] flex items-center justify-between px-4 md:px-6">
-      
       {/* DROPDOWN SEARCH - Made visible on mobile */}
-      <form ref={searchRef} onSubmit={handleSearchSubmit} className="flex-1 max-w-md flex items-center relative mr-3 sm:mr-0">
+      <form
+        ref={searchRef}
+        onSubmit={handleSearchSubmit}
+        className="flex-1 max-w-md flex items-center relative mr-3 sm:mr-0"
+      >
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); setShowSuggestions(true);}} onFocus={() => setShowSuggestions(true)} placeholder="Search users, posts, groups, clips, trade..." className="w-full pl-10 pr-4 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground" autoComplete="off" />
-          
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            placeholder="Search users, posts, groups, clips, trade..."
+            className="w-full pl-10 pr-4 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+            autoComplete="off"
+          />
+
           {/* SUGGESTIONS DROPDOWN */}
           {showSuggestions && searchQuery.trim().length >= 2 && (
             <div className="absolute top-full mt-2 w-full bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50 max-h-[60vh] flex flex-col">
               {isSearching ? (
-                <div className="p-6 flex justify-center text-primary"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                <div className="p-6 flex justify-center text-primary">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
               ) : !hasSuggestions ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">No results found for &quot;{searchQuery}&quot;</div>
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No results found for &quot;{searchQuery}&quot;
+                </div>
               ) : (
                 <div className="overflow-y-auto hide-scrollbar">
-                  
                   {/* USERS */}
                   {suggestions.users.length > 0 && (
                     <div className="p-2">
-                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><UserIcon size={12}/> Users</div>
-                      {suggestions.users.map(u => (
-                        <Link key={u.id} href={`/profile/${u.id}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors">
+                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <UserIcon size={12} /> Users
+                      </div>
+                      {suggestions.users.map((u) => (
+                        <Link
+                          key={u.id}
+                          href={`/profile/${u.id}`}
+                          onClick={() => setShowSuggestions(false)}
+                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                        >
                           <div className="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center overflow-hidden">
-                            {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <span className="text-white text-xs font-bold">{u.nombre?.charAt(0)}</span>}
+                            {u.avatar_url ? (
+                              <img
+                                src={u.avatar_url}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-white text-xs font-bold">
+                                {u.nombre?.charAt(0)}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-sm font-medium text-foreground truncate">{u.nombre} {u.apellido}</span>
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {u.nombre} {u.apellido}
+                          </span>
                         </Link>
                       ))}
                     </div>
@@ -206,13 +408,29 @@ export function Header() {
                   {/* Products (Trade) */}
                   {suggestions.trade.length > 0 && (
                     <div className="p-2 border-t border-border">
-                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Store size={12}/> Trade</div>
-                      {suggestions.trade.map(t => (
-                        <Link key={t.id} href={`/search?q=${encodeURIComponent(t.title)}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors">
-                          <div className="w-8 h-8 rounded-md bg-muted border border-border flex items-center justify-center"><Store size={14} className="text-muted-foreground"/></div>
+                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <Store size={12} /> Trade
+                      </div>
+                      {suggestions.trade.map((t) => (
+                        <Link
+                          key={t.id}
+                          href={`/search?q=${encodeURIComponent(t.title)}`}
+                          onClick={() => setShowSuggestions(false)}
+                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-md bg-muted border border-border flex items-center justify-center">
+                            <Store
+                              size={14}
+                              className="text-muted-foreground"
+                            />
+                          </div>
                           <div className="flex flex-col overflow-hidden">
-                            <span className="text-sm font-medium text-foreground truncate">{t.title}</span>
-                            <span className="text-xs text-primary font-bold">${t.price}</span>
+                            <span className="text-sm font-medium text-foreground truncate">
+                              {t.title}
+                            </span>
+                            <span className="text-xs text-primary font-bold">
+                              ${t.price}
+                            </span>
                           </div>
                         </Link>
                       ))}
@@ -222,37 +440,75 @@ export function Header() {
                   {/* Clips */}
                   {suggestions.clips.length > 0 && (
                     <div className="p-2 border-t border-border">
-                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Video size={12}/> Clips</div>
-                      {suggestions.clips.map(c => (
-                        <Link key={c.id} href={`/clips?id=${c.id}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors">
-                          <div className="w-8 h-8 rounded-md bg-muted border border-border flex items-center justify-center"><Video size={14} className="text-muted-foreground"/></div>
-                          <span className="text-sm font-medium text-foreground truncate line-clamp-1">{c.content || 'Video Clip'}</span>
+                      <div className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <Video size={12} /> Clips
+                      </div>
+                      {suggestions.clips.map((c) => (
+                        <Link
+                          key={c.id}
+                          href={`/clips?id=${c.id}`}
+                          onClick={() => setShowSuggestions(false)}
+                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-md bg-muted border border-border flex items-center justify-center">
+                            <Video
+                              size={14}
+                              className="text-muted-foreground"
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-foreground truncate line-clamp-1">
+                            {c.content || "Video Clip"}
+                          </span>
                         </Link>
                       ))}
                     </div>
                   )}
 
                   {/* Posts & Groups... */}
-                  {(suggestions.posts.length > 0 || suggestions.groups.length > 0) && (
+                  {(suggestions.posts.length > 0 ||
+                    suggestions.groups.length > 0) && (
                     <div className="p-2 border-t border-border">
-                      {suggestions.groups.map(g => (
-                         <Link key={g.id} href={`/search?q=${encodeURIComponent(g.name)}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors">
-                           <Users size={16} className="text-muted-foreground ml-1" />
-                           <span className="text-sm font-medium text-foreground truncate">{g.name}</span>
-                         </Link>
+                      {suggestions.groups.map((g) => (
+                        <Link
+                          key={g.id}
+                          href={`/search?q=${encodeURIComponent(g.name)}`}
+                          onClick={() => setShowSuggestions(false)}
+                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <Users
+                            size={16}
+                            className="text-muted-foreground ml-1"
+                          />
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {g.name}
+                          </span>
+                        </Link>
                       ))}
-                      {suggestions.posts.map(p => (
-                         <Link key={p.id} href={`/search?q=${encodeURIComponent(p.content)}`} onClick={() => setShowSuggestions(false)} className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors">
-                           <FileText size={16} className="text-muted-foreground ml-1 flex-shrink-0" />
-                           <span className="text-sm font-medium text-foreground truncate">{p.content}</span>
-                         </Link>
+                      {suggestions.posts.map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/search?q=${encodeURIComponent(p.content)}`}
+                          onClick={() => setShowSuggestions(false)}
+                          className="flex items-center gap-3 p-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <FileText
+                            size={16}
+                            className="text-muted-foreground ml-1 flex-shrink-0"
+                          />
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {p.content}
+                          </span>
+                        </Link>
                       ))}
                     </div>
                   )}
 
                   {/* See All Results */}
                   <div className="p-2 border-t border-border bg-muted/30">
-                    <button type="submit" className="w-full py-2 text-sm text-primary font-semibold hover:underline">
+                    <button
+                      type="submit"
+                      className="w-full py-2 text-sm text-primary font-semibold hover:underline"
+                    >
                       See all results for &quot;{searchQuery}&quot;
                     </button>
                   </div>
@@ -270,12 +526,19 @@ export function Header() {
           <>
             {/* ADMIN PANEL */}
             {isAdmin && (
-              <Link href="/admin" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-primary hover:text-primary/80" title="Admin Dashboard">
+              <Link
+                href="/admin"
+                className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-primary hover:text-primary/80"
+                title="Admin Dashboard"
+              >
                 <ShieldAlert className="w-5 h-5" />
               </Link>
             )}
-            
-            <Link href="/friends" className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground hidden sm:block">
+
+            <Link
+              href="/friends"
+              className="relative p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground hidden sm:block"
+            >
               <Users className="w-5 h-5" />
             </Link>
 
@@ -284,48 +547,87 @@ export function Header() {
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
                   <span className="absolute top-1 right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground ring-2 ring-background">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </PopoverTrigger>
-              <PopoverContent className="w-80 p-0 mr-4 mt-1 border-border shadow-lg" align="end">
+              <PopoverContent
+                className="w-80 p-0 mr-4 mt-1 border-border shadow-lg"
+                align="end"
+              >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <h3 className="font-semibold text-foreground">Notifications</h3>
-                  {unreadCount > 0 && <button onClick={markAllAsRead} className="text-xs text-primary hover:underline font-medium">Mark all read</button>}
+                  <h3 className="font-semibold text-foreground">
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-primary hover:underline font-medium"
+                    >
+                      Mark all read
+                    </button>
+                  )}
                 </div>
                 <div className="max-h-[350px] overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">You don't have any notifications yet.</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      You don't have any notifications yet.
+                    </div>
                   ) : (
-                    notifications.map(notif => {
+                    notifications.map((notif) => {
                       const { icon, text } = renderNotificationContent(notif);
                       return (
-                        <div key={notif.id} onClick={() => !notif.is_read && markAsRead(notif.id)} className={`flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer ${notif.is_read ? 'opacity-70' : 'bg-primary/5'}`}>
-                          <div className="mt-1 flex-shrink-0 bg-background p-1.5 rounded-full border border-border shadow-sm">{icon}</div>
-                          <div className="flex-1 min-w-0 text-sm text-foreground">
-                            <p className="line-clamp-2 leading-tight mb-1">{text}</p>
-                            <span className="text-xs text-muted-foreground font-medium">{new Date(notif.created_at).toLocaleDateString()}</span>
+                        <div
+                          key={notif.id}
+                          onClick={() => !notif.is_read && markAsRead(notif.id)}
+                          className={`flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer ${notif.is_read ? "opacity-70" : "bg-primary/5"}`}
+                        >
+                          <div className="mt-1 flex-shrink-0 bg-background p-1.5 rounded-full border border-border shadow-sm">
+                            {icon}
                           </div>
-                          {!notif.is_read && <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />}
+                          <div className="flex-1 min-w-0 text-sm text-foreground">
+                            <p className="line-clamp-2 leading-tight mb-1">
+                              {text}
+                            </p>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {new Date(notif.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {!notif.is_read && (
+                            <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                          )}
                         </div>
-                      )
+                      );
                     })
                   )}
                 </div>
               </PopoverContent>
             </Popover>
 
-            <Link href={`/profile/${currentUserId}`} className="flex items-center gap-2 pl-2 sm:border-l border-border cursor-pointer hover:opacity-80 transition-opacity ml-1">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm shadow-sm">{initials || 'U'}</div>
+            <Link
+              href={`/profile/${currentUserId}`}
+              className="flex items-center gap-2 pl-2 sm:border-l border-border cursor-pointer hover:opacity-80 transition-opacity ml-1"
+            >
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm shadow-sm">
+                {initials || "U"}
+              </div>
             </Link>
 
-            <button onClick={handleSignOut} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-1 hidden sm:block">
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-1 hidden sm:block"
+            >
               <LogOut className="w-5 h-5" />
             </button>
           </>
         ) : (
           <div className="flex items-center gap-3 pl-2 sm:border-l border-border">
-            <Link href="/login" className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors">Sign in</Link>
+            <Link
+              href="/login"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Sign in
+            </Link>
           </div>
         )}
       </div>

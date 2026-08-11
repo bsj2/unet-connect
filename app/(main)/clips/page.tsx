@@ -325,6 +325,7 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
             
             <div className="mt-1 flex items-center gap-4">
               <button 
+                data-protected="true"
                 onClick={() => { setReplyingTo(replyingTo === comment.id ? null : comment.id); setReplyText('') }}
                 className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
               >
@@ -412,7 +413,7 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
               {clip.users?.avatar_url ? <img src={clip.users.avatar_url} alt="Creator" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-primary flex items-center justify-center font-bold text-white">{clip.users?.nombre?.charAt(0) || 'U'}</div>}
             </Link>
 
-            <button onClick={handleLike} className="flex flex-col items-center gap-1 group">
+            <button data-protected="true" onClick={handleLike} className="flex flex-col items-center gap-1 group">
               <div className="p-3 bg-black/20 rounded-full backdrop-blur-sm transition-colors">
                 <Heart size={28} className={hasLiked ? "fill-red-500 text-red-500" : "text-white fill-transparent"} />
               </div>
@@ -439,8 +440,8 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
                     topLevelComments.map((comment: any) => renderCommentNode(comment))
                   )}
                 </div>
-
-                <form onSubmit={(e) => submitComment(e, null)} className="mt-auto border-t border-border pt-4 flex gap-2 relative">
+                {currentUserId ? (
+                  <form onSubmit={(e) => submitComment(e, null)} className="mt-auto border-t border-border pt-4 flex gap-2 relative">
                   <input 
                     type="text" 
                     value={newComment} 
@@ -455,6 +456,9 @@ function ClipPlayer({ clip, currentUserId }: { clip: any, currentUserId: string 
                     </button>
                   )}
                 </form>
+                )
+              : (<p className="text-center text-muted-foreground text-sm py-4">Please sign in to add a comment.</p>)}
+                
               </DialogContent>
             </Dialog>
 

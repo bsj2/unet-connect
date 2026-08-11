@@ -202,18 +202,18 @@ export default function ProfilePage() {
           <div className="mb-2 md:mb-4 flex items-center gap-2">
             {!isMyProfile ? (
               <>
-                <button onClick={toggleFollow} disabled={isConnectionLoading} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 ${isFollowing ? 'bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground border border-border' : 'bg-primary hover:bg-primary/90 text-primary-foreground'}`}>
+                <button data-protected="true" onClick={toggleFollow} disabled={isConnectionLoading} className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 ${isFollowing ? 'bg-secondary hover:bg-destructive hover:text-destructive-foreground text-foreground border border-border' : 'bg-primary hover:bg-primary/90 text-primary-foreground'}`}>
                   <UserPlus2 size={18} />
                   <span className="hidden sm:inline">{isFollowing ? 'Unfollow' : 'Follow'}</span>
                 </button>
                 {connectionStatus === 'NONE' && (
-                  <button onClick={sendFriendRequest} disabled={isConnectionLoading} className="flex items-center gap-2 bg-secondary text-foreground border border-border hover:bg-secondary/80 px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50">
+                  <button data-protected="true" onClick={sendFriendRequest} disabled={isConnectionLoading} className="flex items-center gap-2 bg-secondary text-foreground border border-border hover:bg-secondary/80 px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50">
                     <UserPlus size={18} />
                     <span className="hidden sm:inline">Add Friend</span>
                   </button>
                 )}
                 {connectionStatus === 'PENDING_SENT' && (
-                  <button onClick={cancelOrRemoveFriend} disabled={isConnectionLoading} className="flex items-center gap-2 bg-muted hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 group">
+                  <button data-protected="true" onClick={cancelOrRemoveFriend} disabled={isConnectionLoading} className="flex items-center gap-2 bg-muted hover:bg-destructive hover:text-destructive-foreground text-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 group">
                     <Clock size={18} className="group-hover:hidden" />
                     <XIcon size={18} className="hidden group-hover:block" />
                     <span className="hidden sm:inline group-hover:hidden">Request Sent</span>
@@ -221,7 +221,7 @@ export default function ProfilePage() {
                   </button>
                 )}
                 {connectionStatus === 'PENDING_RECEIVED' && (
-                  <button onClick={acceptFriendRequest} disabled={isConnectionLoading} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50">
+                  <button data-protected="true" onClick={acceptFriendRequest} disabled={isConnectionLoading} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50">
                     <Check size={18} />
                     <span className="hidden sm:inline">Accept</span>
                   </button>

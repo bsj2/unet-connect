@@ -111,7 +111,7 @@ export default function GroupsPage() {
           </div>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 w-fit">
+            <DialogTrigger data-protected="true" className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 w-fit">
               <Plus size={18} />
               Create Group
             </DialogTrigger>
