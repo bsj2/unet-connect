@@ -105,7 +105,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="reports" className="w-full">
           <TabsList className="grid grid-cols-3 w-full max-w-md h-auto">
             <TabsTrigger value="reports" className="flex gap-2 py-2"><AlertTriangle size={16}/> Reports</TabsTrigger>
-            <TabsTrigger value="marketplace" className="flex gap-2 py-2"><Store size={16}/> Market Approvals</TabsTrigger>
+            <TabsTrigger value="marketplace" className="flex gap-2 py-2"><Store size={16}/>Approvals</TabsTrigger>
             <TabsTrigger value="users" className="flex gap-2 py-2"><Ban size={16}/> Users & Bans</TabsTrigger>
           </TabsList>
 
