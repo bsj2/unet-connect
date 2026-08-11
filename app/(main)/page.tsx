@@ -192,6 +192,26 @@ export default function InstagramFeedPage() {
       return;
     }
 
+    if (location.trim() && containsInappropriateContent(location)) {
+      toast.add({
+        title: "Inappropriate Content",
+        description:
+          "Your location contains inappropriate language. Please keep it academic and respectful.",
+        type: "warning",
+      });
+      return;
+    }
+
+    if (hashtags.some((tag) => containsInappropriateContent(tag))) {
+      toast.add({
+        title: "Inappropriate Content",
+        description:
+          "One or more of your hashtags contain inappropriate language. Please keep them academic and respectful.",
+        type: "warning",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       const uploadedUrls: string[] = [];
