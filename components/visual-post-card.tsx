@@ -166,7 +166,6 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
           <Link href={`/profile/${post.user_id}`} className="font-semibold text-sm hover:underline text-foreground leading-tight">
             {post.users?.nombre} {post.users?.apellido}
           </Link>
-          {/* Ubicación Integrada Visualmente */}
           {post.location && (
             <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
               <MapPin size={12} className="text-primary/70" /> {post.location}
@@ -243,7 +242,6 @@ export function VisualPostCard({ post, currentUserId, onDelete, layout = 'vertic
             </p>
           )}
           
-          {/* Hashtags Integrados Visualmente */}
           {post.hashtags && post.hashtags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-1">
               {post.hashtags.map((tag: string, idx: number) => (

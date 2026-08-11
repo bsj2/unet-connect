@@ -135,7 +135,7 @@ export function AuthForm() {
 
             {/* Cédula Field */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">ID Card (Cédula)</label>
+              <label className="text-sm font-medium text-foreground">ID Card</label>
               <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-primary overflow-hidden transition-all">
                 <select 
                   value={docType}

@@ -67,7 +67,6 @@ export function ProfileGrid({ userId }: ProfileGridProps) {
 
   return (
     <div className="mt-6">
-      {/* Cuadrícula de 3 columnas */}
       <div className="grid grid-cols-3 gap-1 md:gap-4">
         {posts.map((post) => (
           <Link 
@@ -91,7 +90,6 @@ export function ProfileGrid({ userId }: ProfileGridProps) {
         ))}
       </div>
 
-      {/* Visor Modal al hacer clic */}
       <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black border-border shadow-2xl">
           <DialogHeader className="sr-only">

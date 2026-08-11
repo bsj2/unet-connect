@@ -47,7 +47,6 @@ export default function InstagramFeedPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Estados para la creación de posts visuales
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -58,7 +57,6 @@ export default function InstagramFeedPage() {
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Nuevos estados para el sistema de Badges (Hashtags)
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -150,11 +148,9 @@ export default function InstagramFeedPage() {
     setImageFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // --- LÓGICA DE HASHTAGS (BADGES) ---
   const confirmAddTag = () => {
     const newTag = tagInput.trim().replace(/^#/, "").toLowerCase();
 
-    // Validaciones: no vacío, máx 20 chars, máx 10 tags en total, y no repetidos
     if (
       newTag &&
       newTag.length <= 20 &&
@@ -223,7 +219,7 @@ export default function InstagramFeedPage() {
         image_url: uploadedUrls[0],
         media_urls: uploadedUrls,
         location: location.trim() || null,
-        hashtags: hashtags.length > 0 ? hashtags : null, // Enviamos el array directo
+        hashtags: hashtags.length > 0 ? hashtags : null,
       });
 
       if (postError) throw postError;
@@ -380,7 +376,6 @@ export default function InstagramFeedPage() {
                   />
                 </div>
 
-                {/* --- SISTEMA DE BADGES (HASHTAGS) --- */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium text-foreground flex items-center gap-1">
@@ -416,7 +411,7 @@ export default function InstagramFeedPage() {
                           value={tagInput}
                           onChange={(e) =>
                             setTagInput(e.target.value.slice(0, 20))
-                          } // Límite de 20 caracteres
+                          }
                           onKeyDown={handleTagKeyDown}
                           onBlur={confirmAddTag}
                           className="bg-background border border-border text-foreground rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary w-24"
